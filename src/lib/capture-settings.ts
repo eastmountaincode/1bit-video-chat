@@ -6,8 +6,8 @@ export interface CaptureSettings {
 }
 
 export const DEFAULT_CAPTURE_SETTINGS: CaptureSettings = {
-  frameRate: 12,
-  grayscaleBits: 3,
-  height: 84,
-  width: 112,
+  frameRate: 15,
+  grayscaleBits: 4,
+  height: 126,
+  width: 168,
 };
