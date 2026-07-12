@@ -3,8 +3,10 @@
 import { usePresence } from "@playhtml/react";
 import { useEffect, useMemo, useState } from "react";
 
-import { ChatPanel } from "@/components/chat-panel";
-import { HelperPanel } from "@/components/helper-panel";
+import {
+  RoomSidebar,
+  type SidebarPanel,
+} from "@/components/room-sidebar";
 import { VideoTile } from "@/components/video-tile";
 import { useGrayscaleCamera } from "@/hooks/use-grayscale-camera";
 import {
@@ -28,7 +30,7 @@ export function VideoRoom({ name, onLeave, stream }: VideoRoomProps) {
   const [captureSettings, setCaptureSettings] = useState<CaptureSettings>(
     DEFAULT_CAPTURE_SETTINGS,
   );
-  const [isHelperOpen, setIsHelperOpen] = useState(false);
+  const [activePanel, setActivePanel] = useState<SidebarPanel>("chat");
   const frame = useGrayscaleCamera(stream, captureSettings);
   const { presences, setMyPresence } = usePresence<VideoPresence>("video");
   const setVideoPresence = setMyPresence as (
@@ -69,7 +71,9 @@ export function VideoRoom({ name, onLeave, stream }: VideoRoomProps) {
         event.key.toLowerCase() === "h"
       ) {
         isHelperKeyDown = true;
-        setIsHelperOpen((isOpen) => !isOpen);
+        setActivePanel((panel) =>
+          panel === "settings" ? "chat" : "settings",
+        );
       }
     }
 
@@ -117,15 +121,19 @@ export function VideoRoom({ name, onLeave, stream }: VideoRoomProps) {
   const participantCount = remoteParticipants.length + 1;
 
   return (
-    <main className="room-shell">
-      <section className="video-column">
-        <p className="mobile-site-title">Telepathy</p>
-        <fieldset className="video-fieldset">
+    <main className="room-shell" data-room-part="room">
+      <section className="video-column" data-room-part="video-area">
+        <fieldset className="video-fieldset" data-room-part="video-field">
           <legend>video ({participantCount})</legend>
-          <button className="leave-button" onClick={onLeave} type="button">
+          <button
+            className="leave-button"
+            data-room-part="leave"
+            onClick={onLeave}
+            type="button"
+          >
             leave
           </button>
-          <div className="video-grid">
+          <div className="video-grid" data-room-part="video-grid">
             <VideoTile frame={frame} isMe name={name} />
             {remoteParticipants.map((participant) => (
               <VideoTile
@@ -137,13 +145,13 @@ export function VideoRoom({ name, onLeave, stream }: VideoRoomProps) {
           </div>
         </fieldset>
       </section>
-      <ChatPanel name={name} />
-      {isHelperOpen ? (
-        <HelperPanel
-          onChange={setCaptureSettings}
-          settings={captureSettings}
-        />
-      ) : null}
+      <RoomSidebar
+        activePanel={activePanel}
+        captureSettings={captureSettings}
+        name={name}
+        onCaptureSettingsChange={setCaptureSettings}
+        onPanelChange={setActivePanel}
+      />
     </main>
   );
 }

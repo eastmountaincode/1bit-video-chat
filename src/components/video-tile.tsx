@@ -11,9 +11,9 @@ interface VideoTileProps {
 
 export function VideoTile({ frame, isMe = false, name }: VideoTileProps) {
   return (
-    <figure className="video-tile">
+    <figure className="video-tile" data-room-part="video-card">
       <GrayscaleCanvas frame={frame} />
-      <figcaption>
+      <figcaption data-room-part="video-caption">
         {name}
         {isMe ? " (you)" : ""}
       </figcaption>

@@ -3,11 +3,12 @@
 import type { CaptureSettings } from "@/lib/capture-settings";
 
 interface HelperPanelProps {
+  active: boolean;
   onChange: (settings: CaptureSettings) => void;
   settings: CaptureSettings;
 }
 
-export function HelperPanel({ onChange, settings }: HelperPanelProps) {
+export function HelperPanel({ active, onChange, settings }: HelperPanelProps) {
   function updateWidth(width: number) {
     onChange({
       ...settings,
@@ -17,8 +18,12 @@ export function HelperPanel({ onChange, settings }: HelperPanelProps) {
   }
 
   return (
-    <fieldset className="helper-panel">
-      <legend>helper</legend>
+    <fieldset
+      className="settings-panel sidebar-panel"
+      data-room-part="settings"
+      hidden={!active}
+    >
+      <legend>settings</legend>
 
       <label>
         <span>resolution</span>

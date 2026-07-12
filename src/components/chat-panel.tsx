@@ -10,10 +10,11 @@ const MAX_MESSAGES = 200;
 const defaultLedger: ChatLedger = { messages: [], version: 1 };
 
 interface ChatPanelProps {
+  active: boolean;
   name: string;
 }
 
-export const ChatPanel = memo(function ChatPanel({ name }: ChatPanelProps) {
+export const ChatPanel = memo(function ChatPanel({ active, name }: ChatPanelProps) {
   const [ledger, setLedger] = usePageData<ChatLedger>(
     "global-chat:v1",
     defaultLedger,
@@ -22,7 +23,7 @@ export const ChatPanel = memo(function ChatPanel({ name }: ChatPanelProps) {
   const [message, setMessage] = useState("");
   const [isOpen, setIsOpen] = useState(false);
   const isMobile = useMobileLayout();
-  const isVisible = !isMobile || isOpen;
+  const isVisible = isMobile ? isOpen : active;
   const listRef = useRef<HTMLOListElement>(null);
 
   useEffect(() => {
@@ -101,11 +102,9 @@ export const ChatPanel = memo(function ChatPanel({ name }: ChatPanelProps) {
   );
 
   return (
-    <aside className={`chat-column${isOpen ? " chat-open" : ""}`}>
-      <p className="chat-site-title">Telepathy</p>
-
+    <section className={`chat-panel${isOpen ? " chat-open" : ""}`}>
       <div className="chat-drawer" hidden={!isVisible} id="chat-drawer">
-        <fieldset className="chat-fieldset">
+        <fieldset className="chat-fieldset" data-room-part="chat">
           <legend>chat</legend>
 
           <ol className="message-list" ref={listRef}>
@@ -113,6 +112,8 @@ export const ChatPanel = memo(function ChatPanel({ name }: ChatPanelProps) {
             {ledger.messages.map((item) => (
               <li
                 className={item.author === name ? "message-own" : undefined}
+                data-message-side={item.author === name ? "own" : "other"}
+                data-room-part="message"
                 key={item.id}
               >
                 <span className="message-meta">
@@ -133,7 +134,7 @@ export const ChatPanel = memo(function ChatPanel({ name }: ChatPanelProps) {
         </fieldset>
       </div>
 
-      <div className="chat-control-bar">
+      <div className="chat-control-bar" data-room-part="chat-controls">
         {isMobile && isOpen ? chatForm : null}
         <button
           aria-controls="chat-drawer"
@@ -146,6 +147,6 @@ export const ChatPanel = memo(function ChatPanel({ name }: ChatPanelProps) {
           chat
         </button>
       </div>
-    </aside>
+    </section>
   );
 });

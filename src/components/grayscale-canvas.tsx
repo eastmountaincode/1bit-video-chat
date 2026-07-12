@@ -28,6 +28,7 @@ export function GrayscaleCanvas({ frame }: GrayscaleCanvasProps) {
     <canvas
       aria-label="Low-resolution grayscale camera image"
       className="grayscale-canvas"
+      data-room-part="video-frame"
       ref={canvasRef}
     />
   );
