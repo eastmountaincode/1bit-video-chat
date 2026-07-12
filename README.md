@@ -1,4 +1,4 @@
-# see you, see me
+# Sesame Chat
 
 A silent low-resolution grayscale video room built with Next.js and PlayHTML.
 

@@ -46,10 +46,37 @@ export function useGrayscaleCamera(stream: MediaStream | null) {
         now - lastCaptureAt >= FRAME_INTERVAL_MS
       ) {
         lastCaptureAt = now;
+        const sourceWidth = video.videoWidth;
+        const sourceHeight = video.videoHeight;
+        const sourceAspect = sourceWidth / sourceHeight;
+        const targetAspect = FRAME_WIDTH / FRAME_HEIGHT;
+        let cropX = 0;
+        let cropY = 0;
+        let cropWidth = sourceWidth;
+        let cropHeight = sourceHeight;
+
+        if (sourceAspect > targetAspect) {
+          cropWidth = sourceHeight * targetAspect;
+          cropX = (sourceWidth - cropWidth) / 2;
+        } else if (sourceAspect < targetAspect) {
+          cropHeight = sourceWidth / targetAspect;
+          cropY = (sourceHeight - cropHeight) / 2;
+        }
+
         context.save();
         context.translate(FRAME_WIDTH, 0);
         context.scale(-1, 1);
-        context.drawImage(video, 0, 0, FRAME_WIDTH, FRAME_HEIGHT);
+        context.drawImage(
+          video,
+          cropX,
+          cropY,
+          cropWidth,
+          cropHeight,
+          0,
+          0,
+          FRAME_WIDTH,
+          FRAME_HEIGHT,
+        );
         context.restore();
 
         const image = context.getImageData(0, 0, FRAME_WIDTH, FRAME_HEIGHT);
