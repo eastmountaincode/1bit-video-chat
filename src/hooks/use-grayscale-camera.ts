@@ -2,16 +2,17 @@
 
 import { useEffect, useState } from "react";
 
-import {
-  FRAME_HEIGHT,
-  FRAME_INTERVAL_MS,
-  FRAME_WIDTH,
-  packGrayscaleFrame,
-} from "@/lib/grayscale-frame";
+import type { CaptureSettings } from "@/lib/capture-settings";
+import { DEFAULT_CAPTURE_SETTINGS } from "@/lib/capture-settings";
+import { packGrayscaleFrame } from "@/lib/grayscale-frame";
 import type { GrayscaleFrame } from "@/lib/shared-types";
 
-export function useGrayscaleCamera(stream: MediaStream | null) {
+export function useGrayscaleCamera(
+  stream: MediaStream | null,
+  settings: CaptureSettings = DEFAULT_CAPTURE_SETTINGS,
+) {
   const [frame, setFrame] = useState<GrayscaleFrame | null>(null);
+  const { frameRate, grayscaleBits, height, width } = settings;
 
   useEffect(() => {
     if (!stream) return;
@@ -25,8 +26,8 @@ export function useGrayscaleCamera(stream: MediaStream | null) {
 
     if (!context) return;
 
-    canvas.width = FRAME_WIDTH;
-    canvas.height = FRAME_HEIGHT;
+    canvas.width = width;
+    canvas.height = height;
     context.imageSmoothingEnabled = false;
     video.autoplay = true;
     video.muted = true;
@@ -43,13 +44,13 @@ export function useGrayscaleCamera(stream: MediaStream | null) {
 
       if (
         video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA &&
-        now - lastCaptureAt >= FRAME_INTERVAL_MS
+        now - lastCaptureAt >= 1000 / frameRate
       ) {
         lastCaptureAt = now;
         const sourceWidth = video.videoWidth;
         const sourceHeight = video.videoHeight;
         const sourceAspect = sourceWidth / sourceHeight;
-        const targetAspect = FRAME_WIDTH / FRAME_HEIGHT;
+        const targetAspect = width / height;
         let cropX = 0;
         let cropY = 0;
         let cropWidth = sourceWidth;
@@ -64,7 +65,7 @@ export function useGrayscaleCamera(stream: MediaStream | null) {
         }
 
         context.save();
-        context.translate(FRAME_WIDTH, 0);
+        context.translate(width, 0);
         context.scale(-1, 1);
         context.drawImage(
           video,
@@ -74,13 +75,18 @@ export function useGrayscaleCamera(stream: MediaStream | null) {
           cropHeight,
           0,
           0,
-          FRAME_WIDTH,
-          FRAME_HEIGHT,
+          width,
+          height,
         );
         context.restore();
 
-        const image = context.getImageData(0, 0, FRAME_WIDTH, FRAME_HEIGHT);
-        const nextFrame = packGrayscaleFrame(image.data);
+        const image = context.getImageData(0, 0, width, height);
+        const nextFrame = packGrayscaleFrame(
+          image.data,
+          width,
+          height,
+          grayscaleBits,
+        );
 
         if (nextFrame.data !== lastFrameData) {
           lastFrameData = nextFrame.data;
@@ -112,7 +118,7 @@ export function useGrayscaleCamera(stream: MediaStream | null) {
       video.pause();
       video.srcObject = null;
     };
-  }, [stream]);
+  }, [frameRate, grayscaleBits, height, stream, width]);
 
   return stream ? frame : null;
 }

@@ -2,10 +2,11 @@
 
 A silent low-resolution grayscale video room built with Next.js and PlayHTML.
 
-- Camera frames are reduced to `80 × 60`, quantized to 4-bit grayscale, packed two pixels per byte, and sent at up to 15 fps through PlayHTML presence.
+- Camera frames default to `88 × 66`, quantized to 4-bit grayscale, packed two pixels per byte, and sent at up to 15 fps through PlayHTML presence.
 - Video presence is ephemeral and disappears when a visitor leaves.
 - Global chat uses PlayHTML page data and persists the newest 200 messages.
 - There is one shared room for the MVP.
+- Press `H` in the room to tune resolution, grayscale levels, and frame rate locally.
 
 ## Development
 

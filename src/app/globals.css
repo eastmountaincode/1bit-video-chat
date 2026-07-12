@@ -137,6 +137,10 @@ legend {
   min-height: 100svh;
 }
 
+.mobile-site-title {
+  display: none;
+}
+
 .video-column {
   min-width: 0;
   padding: 1rem;
@@ -193,6 +197,14 @@ legend {
   padding: 1rem;
 }
 
+.chat-drawer {
+  height: 100%;
+}
+
+.chat-toggle-bar {
+  display: none;
+}
+
 .chat-fieldset {
   display: grid;
   gap: 0.75rem;
@@ -200,6 +212,13 @@ legend {
   height: calc(100svh - 2rem);
   position: sticky;
   top: 1rem;
+}
+
+.chat-site-title {
+  margin: 0;
+  position: absolute;
+  right: 0.75rem;
+  top: 0.45rem;
 }
 
 .message-list {
@@ -234,9 +253,50 @@ legend {
   justify-self: end;
 }
 
+.helper-panel {
+  background: var(--background);
+  left: 50%;
+  margin: 0;
+  padding: 0.75rem;
+  position: fixed;
+  top: 1rem;
+  transform: translateX(-50%);
+  width: min(30rem, calc(100vw - 2rem));
+  z-index: 70;
+}
+
+.helper-panel label {
+  align-items: center;
+  display: grid;
+  gap: 0.5rem;
+  grid-template-columns: 5rem minmax(0, 1fr) 5rem;
+}
+
+.helper-panel label + label {
+  margin-top: 0.5rem;
+}
+
+.helper-panel input[type="range"] {
+  border: 0;
+  min-height: auto;
+  padding: 0;
+  width: 100%;
+}
+
+.helper-panel output {
+  text-align: right;
+}
+
 @media (max-width: 720px) {
   .room-shell {
     display: block;
+    padding-bottom: 2.5rem;
+  }
+
+  .mobile-site-title {
+    display: block;
+    margin: 0 0 0.75rem;
+    text-align: right;
   }
 
   .video-fieldset {
@@ -244,12 +304,54 @@ legend {
   }
 
   .chat-column {
-    border-left: 0;
+    border: 0;
+    inset: auto 0 0 auto;
+    padding: 0;
+    position: fixed;
+    z-index: 50;
+  }
+
+  .chat-toggle-bar {
+    background: var(--background);
+    bottom: 0;
+    display: flex;
+    justify-content: flex-end;
+    position: fixed;
+    right: 0;
+    z-index: 52;
+  }
+
+  .chat-open .chat-toggle-bar {
+    border-left: 1px solid #000000;
     border-top: 1px solid #000000;
+    left: 0;
+  }
+
+  .chat-toggle-button {
+    border-bottom: 0;
+    border-right: 0;
+    min-height: 2.5rem;
+    padding-inline: 0.75rem;
+  }
+
+  .chat-drawer {
+    background: var(--background);
+    border: 1px solid #000000;
+    bottom: 2.5rem;
+    height: 65svh;
+    left: 0;
+    padding: 0.75rem;
+    position: fixed;
+    right: 0;
+    z-index: 51;
   }
 
   .chat-fieldset {
-    height: 65svh;
-    position: static;
+    height: 100%;
+    position: relative;
+  }
+
+  .chat-site-title {
+    display: none;
   }
 }

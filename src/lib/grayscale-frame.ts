@@ -1,16 +1,16 @@
+import { DEFAULT_CAPTURE_SETTINGS } from "@/lib/capture-settings";
 import type { GrayscaleFrame } from "@/lib/shared-types";
-
-export const FRAME_WIDTH = 80;
-export const FRAME_HEIGHT = 60;
-export const FRAME_INTERVAL_MS = 1000 / 15;
 
 export function packGrayscaleFrame(
   pixels: Uint8ClampedArray,
-  width = FRAME_WIDTH,
-  height = FRAME_HEIGHT,
+  width = DEFAULT_CAPTURE_SETTINGS.width,
+  height = DEFAULT_CAPTURE_SETTINGS.height,
+  grayscaleBits = DEFAULT_CAPTURE_SETTINGS.grayscaleBits,
 ): GrayscaleFrame {
   const pixelCount = width * height;
   const packed = new Uint8Array(Math.ceil(pixelCount / 2));
+  const bitCount = Math.max(1, Math.min(4, Math.round(grayscaleBits)));
+  const maximumQuantizedLevel = (1 << bitCount) - 1;
 
   for (let pixelIndex = 0; pixelIndex < pixelCount; pixelIndex += 1) {
     const rgbaIndex = pixelIndex * 4;
@@ -19,7 +19,12 @@ export function packGrayscaleFrame(
         pixels[rgbaIndex + 1] * 183 +
         pixels[rgbaIndex + 2] * 19) >>
       8;
-    const level = Math.min(15, Math.round(luminance / 17));
+    const quantizedLevel = Math.round(
+      (luminance / 255) * maximumQuantizedLevel,
+    );
+    const level = Math.round(
+      (quantizedLevel / maximumQuantizedLevel) * 15,
+    );
 
     if ((pixelIndex & 1) === 0) {
       packed[pixelIndex >> 1] = level << 4;
