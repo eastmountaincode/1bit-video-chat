@@ -8,8 +8,8 @@ export function packGrayscaleFrame(
   grayscaleBits = DEFAULT_CAPTURE_SETTINGS.grayscaleBits,
 ): GrayscaleFrame {
   const pixelCount = width * height;
-  const packed = new Uint8Array(Math.ceil(pixelCount / 2));
-  const bitCount = Math.max(1, Math.min(4, Math.round(grayscaleBits)));
+  const bitCount = Math.max(1, Math.min(5, Math.round(grayscaleBits)));
+  const packed = new Uint8Array(Math.ceil((pixelCount * bitCount) / 8));
   const maximumQuantizedLevel = (1 << bitCount) - 1;
 
   for (let pixelIndex = 0; pixelIndex < pixelCount; pixelIndex += 1) {
@@ -22,14 +22,13 @@ export function packGrayscaleFrame(
     const quantizedLevel = Math.round(
       (luminance / 255) * maximumQuantizedLevel,
     );
-    const level = Math.round(
-      (quantizedLevel / maximumQuantizedLevel) * 15,
-    );
+    const bitOffset = pixelIndex * bitCount;
 
-    if ((pixelIndex & 1) === 0) {
-      packed[pixelIndex >> 1] = level << 4;
-    } else {
-      packed[pixelIndex >> 1] |= level;
+    for (let bitIndex = 0; bitIndex < bitCount; bitIndex += 1) {
+      const absoluteBit = bitOffset + bitIndex;
+      const value =
+        (quantizedLevel >> (bitCount - bitIndex - 1)) & 1;
+      packed[absoluteBit >> 3] |= value << (7 - (absoluteBit & 7));
     }
   }
 
@@ -39,6 +38,7 @@ export function packGrayscaleFrame(
   }
 
   return {
+    bits: bitCount,
     data: window.btoa(binary),
     height,
     width,
@@ -49,11 +49,23 @@ export function unpackGrayscaleFrame(frame: GrayscaleFrame): ImageData {
   const binary = window.atob(frame.data);
   const image = new ImageData(frame.width, frame.height);
   const pixelCount = frame.width * frame.height;
+  const bitCount = Math.max(1, Math.min(5, Math.round(frame.bits ?? 4)));
+  const maximumQuantizedLevel = (1 << bitCount) - 1;
 
   for (let pixelIndex = 0; pixelIndex < pixelCount; pixelIndex += 1) {
-    const byte = binary.charCodeAt(pixelIndex >> 1);
-    const level = (pixelIndex & 1) === 0 ? byte >> 4 : byte & 0x0f;
-    const value = level * 17;
+    const bitOffset = pixelIndex * bitCount;
+    let quantizedLevel = 0;
+
+    for (let bitIndex = 0; bitIndex < bitCount; bitIndex += 1) {
+      const absoluteBit = bitOffset + bitIndex;
+      const byte = binary.charCodeAt(absoluteBit >> 3);
+      const bit = (byte >> (7 - (absoluteBit & 7))) & 1;
+      quantizedLevel = (quantizedLevel << 1) | bit;
+    }
+
+    const value = Math.round(
+      (quantizedLevel / maximumQuantizedLevel) * 255,
+    );
     const rgbaIndex = pixelIndex * 4;
 
     image.data[rgbaIndex] = value;

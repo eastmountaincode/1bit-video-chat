@@ -1,4 +1,5 @@
 export interface GrayscaleFrame {
+  bits?: number;
   data: string;
   height: number;
   width: number;

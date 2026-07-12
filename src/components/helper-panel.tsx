@@ -23,8 +23,8 @@ export function HelperPanel({ onChange, settings }: HelperPanelProps) {
       <label>
         <span>resolution</span>
         <input
-          max={88}
-          min={48}
+          max={216}
+          min={8}
           onChange={(event) => updateWidth(Number(event.target.value))}
           step={4}
           type="range"
@@ -38,7 +38,7 @@ export function HelperPanel({ onChange, settings }: HelperPanelProps) {
       <label>
         <span>gray bits</span>
         <input
-          max={4}
+          max={5}
           min={1}
           onChange={(event) =>
             onChange({
@@ -56,8 +56,8 @@ export function HelperPanel({ onChange, settings }: HelperPanelProps) {
       <label>
         <span>fps</span>
         <input
-          max={15}
-          min={5}
+          max={23}
+          min={1}
           onChange={(event) =>
             onChange({
               ...settings,
