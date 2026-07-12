@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Sesame Chat",
+  title: "Telepathy",
   description: "A shared low-resolution grayscale video room.",
 };
 

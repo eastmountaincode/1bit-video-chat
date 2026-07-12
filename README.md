@@ -1,4 +1,4 @@
-# Sesame Chat
+# Telepathy
 
 A silent low-resolution grayscale video room built with Next.js and PlayHTML.
 

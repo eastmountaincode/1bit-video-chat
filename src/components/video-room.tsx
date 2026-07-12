@@ -119,7 +119,7 @@ export function VideoRoom({ name, onLeave, stream }: VideoRoomProps) {
   return (
     <main className="room-shell">
       <section className="video-column">
-        <p className="mobile-site-title">Sesame Chat</p>
+        <p className="mobile-site-title">Telepathy</p>
         <fieldset className="video-fieldset">
           <legend>video ({participantCount})</legend>
           <button className="leave-button" onClick={onLeave} type="button">

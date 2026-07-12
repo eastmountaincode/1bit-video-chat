@@ -40,7 +40,7 @@ export function JoinSplash({
     <main className="splash-page">
       <form className="join-form" onSubmit={handleSubmit}>
         <fieldset>
-          <legend>Sesame Chat</legend>
+          <legend>Telepathy</legend>
 
           <dl className="permission-list">
             <div>

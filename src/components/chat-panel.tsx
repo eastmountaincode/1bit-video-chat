@@ -102,7 +102,7 @@ export const ChatPanel = memo(function ChatPanel({ name }: ChatPanelProps) {
 
   return (
     <aside className={`chat-column${isOpen ? " chat-open" : ""}`}>
-      <p className="chat-site-title">Sesame Chat</p>
+      <p className="chat-site-title">Telepathy</p>
 
       <div className="chat-drawer" hidden={!isVisible} id="chat-drawer">
         <fieldset className="chat-fieldset">
