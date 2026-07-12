@@ -111,7 +111,10 @@ export const ChatPanel = memo(function ChatPanel({ name }: ChatPanelProps) {
           <ol className="message-list" ref={listRef}>
             {ledger.messages.length === 0 ? <li>no messages yet</li> : null}
             {ledger.messages.map((item) => (
-              <li key={item.id}>
+              <li
+                className={item.author === name ? "message-own" : undefined}
+                key={item.id}
+              >
                 <span className="message-meta">
                   <strong>{item.author}</strong>{" "}
                   <time dateTime={new Date(item.sentAt).toISOString()}>
