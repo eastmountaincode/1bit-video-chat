@@ -347,6 +347,7 @@ legend {
 
   .chat-drawer {
     background: var(--background);
+    border-top: 1px solid #000000;
     bottom: 2.75rem;
     height: 65svh;
     left: 0;
