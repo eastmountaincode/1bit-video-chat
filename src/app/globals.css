@@ -201,7 +201,7 @@ legend {
   height: 100%;
 }
 
-.chat-toggle-bar {
+.chat-control-bar {
   display: none;
 }
 
@@ -290,7 +290,7 @@ legend {
 @media (max-width: 720px) {
   .room-shell {
     display: block;
-    padding-bottom: 2.5rem;
+    padding-bottom: 2.75rem;
   }
 
   .mobile-site-title {
@@ -311,7 +311,8 @@ legend {
     z-index: 50;
   }
 
-  .chat-toggle-bar {
+  .chat-control-bar {
+    align-items: stretch;
     background: var(--background);
     bottom: 0;
     display: flex;
@@ -321,34 +322,79 @@ legend {
     z-index: 52;
   }
 
-  .chat-open .chat-toggle-bar {
-    border-left: 1px solid #000000;
+  .chat-open .chat-control-bar {
     border-top: 1px solid #000000;
     left: 0;
   }
 
   .chat-toggle-button {
-    border-bottom: 0;
+    border: 0;
+    border-left: 1px solid #000000;
     border-right: 0;
-    min-height: 2.5rem;
+    flex: 0 0 5rem;
+    min-height: 2.75rem;
     padding-inline: 0.75rem;
   }
 
   .chat-drawer {
     background: var(--background);
-    border: 1px solid #000000;
-    bottom: 2.5rem;
+    bottom: 2.75rem;
     height: 65svh;
     left: 0;
-    padding: 0.75rem;
+    padding: 0;
     position: fixed;
     right: 0;
     z-index: 51;
   }
 
   .chat-fieldset {
-    height: 100%;
-    position: relative;
+    bottom: 0.75rem;
+    grid-template-rows: minmax(0, 1fr);
+    height: auto;
+    left: 0.75rem;
+    min-height: 0;
+    position: absolute;
+    right: 0.75rem;
+    top: 0.75rem;
+  }
+
+  .chat-form {
+    display: flex;
+    flex: 1 1 auto;
+    gap: 0;
+    min-width: 0;
+  }
+
+  .chat-form label {
+    display: none;
+  }
+
+  .chat-form input {
+    border: 0;
+    flex: 1 1 auto;
+    font-size: 16px;
+    min-height: 2.75rem;
+    min-width: 0;
+    padding-inline: 0.5rem;
+  }
+
+  .chat-form .chat-submit-button {
+    align-items: center;
+    border: 0;
+    border-left: 1px solid #000000;
+    display: flex;
+    flex: 0 0 2.75rem;
+    justify-content: center;
+    padding: 0;
+  }
+
+  .chat-submit-icon {
+    height: 1.15rem;
+    stroke: currentColor;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-width: 1.5;
+    width: 1.15rem;
   }
 
   .chat-site-title {

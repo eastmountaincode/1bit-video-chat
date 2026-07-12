@@ -53,21 +53,55 @@ export const ChatPanel = memo(function ChatPanel({ name }: ChatPanelProps) {
     setMessage("");
   }
 
+  const chatForm = (
+    <form className="chat-form" onSubmit={handleSubmit}>
+      <label htmlFor="chat-message">message</label>
+      {isMobile ? (
+        <input
+          aria-label="message"
+          disabled={isLoading}
+          id="chat-message"
+          maxLength={500}
+          onChange={(event) => setMessage(event.target.value)}
+          placeholder="type message..."
+          type="text"
+          value={message}
+        />
+      ) : (
+        <textarea
+          disabled={isLoading}
+          id="chat-message"
+          maxLength={500}
+          onChange={(event) => setMessage(event.target.value)}
+          rows={3}
+          value={message}
+        />
+      )}
+      <button
+        aria-label={isMobile ? "Send message" : undefined}
+        className="chat-submit-button"
+        disabled={isLoading || message.trim().length === 0}
+        type="submit"
+      >
+        {isMobile ? (
+          <svg
+            aria-hidden="true"
+            className="chat-submit-icon"
+            fill="none"
+            viewBox="0 0 24 24"
+          >
+            <path d="M22 2 11 13" />
+            <path d="m22 2-7 20-4-9-9-4Z" />
+          </svg>
+        ) : (
+          "send"
+        )}
+      </button>
+    </form>
+  );
+
   return (
     <aside className={`chat-column${isOpen ? " chat-open" : ""}`}>
-      <div className="chat-toggle-bar">
-        <button
-          aria-controls="chat-drawer"
-          aria-expanded={isVisible}
-          aria-label={isOpen ? "Close chat" : "Open chat"}
-          className="chat-toggle-button"
-          onClick={() => setIsOpen((open) => !open)}
-          type="button"
-        >
-          chat
-        </button>
-      </div>
-
       <div className="chat-drawer" hidden={!isVisible} id="chat-drawer">
         <fieldset className="chat-fieldset">
           <legend>chat</legend>
@@ -91,24 +125,22 @@ export const ChatPanel = memo(function ChatPanel({ name }: ChatPanelProps) {
             ))}
           </ol>
 
-          <form className="chat-form" onSubmit={handleSubmit}>
-            <label htmlFor="chat-message">message</label>
-            <textarea
-              disabled={isLoading}
-              id="chat-message"
-              maxLength={500}
-              onChange={(event) => setMessage(event.target.value)}
-              rows={3}
-              value={message}
-            />
-            <button
-              disabled={isLoading || message.trim().length === 0}
-              type="submit"
-            >
-              send
-            </button>
-          </form>
+          {!isMobile ? chatForm : null}
         </fieldset>
+      </div>
+
+      <div className="chat-control-bar">
+        {isMobile && isOpen ? chatForm : null}
+        <button
+          aria-controls="chat-drawer"
+          aria-expanded={isVisible}
+          aria-label={isOpen ? "Close chat" : "Open chat"}
+          className="chat-toggle-button"
+          onClick={() => setIsOpen((open) => !open)}
+          type="button"
+        >
+          chat
+        </button>
       </div>
     </aside>
   );
