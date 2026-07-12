@@ -193,12 +193,19 @@ legend {
 
 .chat-column {
   border-left: 1px solid #000000;
+  display: grid;
+  gap: 0.75rem;
+  grid-template-rows: auto minmax(0, 1fr);
+  height: 100svh;
   min-width: 0;
   padding: 1rem;
+  position: sticky;
+  top: 0;
 }
 
 .chat-drawer {
   height: 100%;
+  min-height: 0;
 }
 
 .chat-control-bar {
@@ -209,16 +216,13 @@ legend {
   display: grid;
   gap: 0.75rem;
   grid-template-rows: minmax(0, 1fr) auto;
-  height: calc(100svh - 2rem);
-  position: sticky;
-  top: 1rem;
+  height: 100%;
+  position: relative;
 }
 
 .chat-site-title {
   margin: 0;
-  position: absolute;
-  right: 0.75rem;
-  top: 0.45rem;
+  text-align: right;
 }
 
 .message-list {
@@ -305,6 +309,8 @@ legend {
 
   .chat-column {
     border: 0;
+    display: block;
+    height: auto;
     inset: auto 0 0 auto;
     padding: 0;
     position: fixed;
@@ -314,6 +320,7 @@ legend {
   .chat-control-bar {
     align-items: stretch;
     background: var(--background);
+    border-top: 1px solid #000000;
     bottom: 0;
     display: flex;
     justify-content: flex-end;
@@ -323,7 +330,6 @@ legend {
   }
 
   .chat-open .chat-control-bar {
-    border-top: 1px solid #000000;
     left: 0;
   }
 
