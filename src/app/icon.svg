@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <radialGradient
+      id="telepathy-gradient"
+      cx="256"
+      cy="256"
+      r="362.038672"
+      gradientUnits="userSpaceOnUse"
+    >
+      <stop offset="0" stop-color="rgb(42 123 155)" />
+      <stop offset="0.5" stop-color="rgb(87 1 133)" />
+      <stop offset="1" stop-color="rgb(237 221 83)" />
+    </radialGradient>
+  </defs>
+  <rect width="512" height="512" fill="url(#telepathy-gradient)" />
+</svg>
