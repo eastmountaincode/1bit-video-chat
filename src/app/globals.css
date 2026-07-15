@@ -76,6 +76,19 @@ legend {
   background: var(--focus);
 }
 
+.visually-hidden {
+  border: 0;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  padding: 0;
+  position: absolute;
+  white-space: nowrap;
+  width: 1px;
+}
+
 .splash-page {
   display: grid;
   min-height: 100svh;
@@ -184,10 +197,24 @@ legend {
 }
 
 .video-tile figcaption {
+  align-items: baseline;
   border-top: 1px solid #000000;
-  overflow: hidden;
+  display: flex;
+  gap: 0.5rem;
+  justify-content: space-between;
   padding: 0.2rem 0.35rem;
+}
+
+.video-caption-name {
+  min-width: 0;
+  overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.video-rate {
+  flex: none;
+  font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
 

@@ -9,6 +9,7 @@ export const ROOM_STYLE_TARGETS = [
   '[data-room-part="video-card"]',
   '[data-room-part="video-frame"]',
   '[data-room-part="video-caption"]',
+  '[data-room-part="video-rate"]',
   '[data-room-part="leave"]',
   '[data-room-part="sidebar"]',
   '[data-room-part="sidebar-tabs"]',
@@ -32,11 +33,29 @@ export interface RoomStyleData {
   version: 1;
 }
 
+export interface CollaborativeRoomStyleData {
+  /**
+   * UTF-16 code units, matching textarea selection offsets. Null means this
+   * room has not migrated from the legacy scalar CSS document yet.
+   */
+  chars: string[] | null;
+  updatedAt: number;
+  updatedBy: string;
+  version: 2;
+}
+
 export const DEFAULT_ROOM_STYLE: RoomStyleData = {
   css: ROOM_STYLE_SCAFFOLD,
   updatedAt: 0,
   updatedBy: "",
   version: 1,
+};
+
+export const DEFAULT_COLLABORATIVE_ROOM_STYLE: CollaborativeRoomStyleData = {
+  chars: null,
+  updatedAt: 0,
+  updatedBy: "",
+  version: 2,
 };
 
 function escapeRegExp(value: string) {

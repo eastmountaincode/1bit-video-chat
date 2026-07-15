@@ -1,7 +1,7 @@
 "use client";
 
-import { usePresence } from "@playhtml/react";
-import { useEffect, useMemo, useState } from "react";
+import { usePlayContext, usePresence } from "@playhtml/react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import {
   RoomSidebar,
@@ -13,7 +13,16 @@ import {
   DEFAULT_CAPTURE_SETTINGS,
   type CaptureSettings,
 } from "@/lib/capture-settings";
-import type { VideoPresence } from "@/lib/shared-types";
+import type {
+  VideoPayloadRate,
+  VideoPresence,
+} from "@/lib/shared-types";
+import {
+  measureVideoPayloadBytes,
+  recordVideoPayloadSample,
+  VIDEO_PAYLOAD_RATE_WINDOW_MS,
+  type VideoPayloadSample,
+} from "@/lib/video-payload-rate";
 
 interface VideoRoomProps {
   name: string;
@@ -32,21 +41,40 @@ export function VideoRoom({ name, onLeave, stream }: VideoRoomProps) {
   );
   const [activePanel, setActivePanel] = useState<SidebarPanel>("chat");
   const frame = useGrayscaleCamera(stream, captureSettings);
+  const { isLoading } = usePlayContext();
   const { presences, setMyPresence } = usePresence<VideoPresence>("video");
+  const payloadSamplesRef = useRef<VideoPayloadSample[]>([]);
+  const [localPayloadRate, setLocalPayloadRate] =
+    useState<VideoPayloadRate | null>(null);
   const setVideoPresence = setMyPresence as (
     value: VideoPresence | null,
   ) => void;
 
   useEffect(() => {
-    if (!frame) return;
-    setVideoPresence({ frame, name });
-  }, [frame, name, setVideoPresence]);
+    if (!frame || isLoading) return;
+
+    const measuredAt = Date.now();
+    const payloadWindow = recordVideoPayloadSample(
+      payloadSamplesRef.current,
+      performance.now(),
+      measureVideoPayloadBytes({ frame, name }),
+    );
+    const payloadRate: VideoPayloadRate = {
+      bytesPerSecond: payloadWindow.bytesPerSecond,
+      measuredAt,
+      windowMs: VIDEO_PAYLOAD_RATE_WINDOW_MS,
+    };
+
+    payloadSamplesRef.current = payloadWindow.samples;
+    setLocalPayloadRate(payloadRate);
+    setVideoPresence({ frame, name, payloadRate });
+  }, [frame, isLoading, name, setVideoPresence]);
 
   useEffect(
     () => () => {
-      setVideoPresence(null);
+      if (!isLoading) setVideoPresence(null);
     },
-    [setVideoPresence],
+    [isLoading, setVideoPresence],
   );
 
   useEffect(() => {
@@ -134,12 +162,18 @@ export function VideoRoom({ name, onLeave, stream }: VideoRoomProps) {
             leave
           </button>
           <div className="video-grid" data-room-part="video-grid">
-            <VideoTile frame={frame} isMe name={name} />
+            <VideoTile
+              frame={frame}
+              isMe
+              name={name}
+              payloadRate={localPayloadRate}
+            />
             {remoteParticipants.map((participant) => (
               <VideoTile
                 frame={participant.frame}
                 key={participant.id}
                 name={participant.name}
+                payloadRate={participant.payloadRate}
               />
             ))}
           </div>

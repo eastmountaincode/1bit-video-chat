@@ -8,6 +8,13 @@ export interface GrayscaleFrame {
 export interface VideoPresence extends Record<string, unknown> {
   frame: GrayscaleFrame;
   name: string;
+  payloadRate?: VideoPayloadRate;
+}
+
+export interface VideoPayloadRate {
+  bytesPerSecond: number;
+  measuredAt: number;
+  windowMs: number;
 }
 
 export interface ChatMessage {
