@@ -8,6 +8,7 @@ export const ROOM_STYLE_TARGETS = [
   '[data-room-part="video-grid"]',
   '[data-room-part="video-card"]',
   '[data-room-part="video-frame"]',
+  '[data-room-part="video-pixel"]',
   '[data-room-part="video-caption"]',
   '[data-room-part="video-rate"]',
   '[data-room-part="leave"]',
@@ -41,7 +42,7 @@ export interface CollaborativeRoomStyleData {
   chars: string[] | null;
   updatedAt: number;
   updatedBy: string;
-  version: 2;
+  version: 2 | 3;
 }
 
 export const DEFAULT_ROOM_STYLE: RoomStyleData = {
@@ -55,7 +56,7 @@ export const DEFAULT_COLLABORATIVE_ROOM_STYLE: CollaborativeRoomStyleData = {
   chars: null,
   updatedAt: 0,
   updatedBy: "",
-  version: 2,
+  version: 3,
 };
 
 function escapeRegExp(value: string) {

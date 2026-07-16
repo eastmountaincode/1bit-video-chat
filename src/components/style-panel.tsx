@@ -115,9 +115,39 @@ export function StylePanel({ active, name }: StylePanelProps) {
       draft.chars = source.css.split("");
       draft.updatedAt = source.updatedAt;
       draft.updatedBy = source.updatedBy;
-      draft.version = 2;
+      draft.version = 3;
     });
   }, [hasSharedDocument, isLoading, setSharedDocument]);
+
+  useEffect(() => {
+    if (isLoading || !hasSharedDocument) return;
+
+    const scaffoldedCss = ensureRoomStyleScaffold(sharedCss);
+    if (sharedDocument.version === 3 && scaffoldedCss === sharedCss) return;
+
+    setSharedDocument((draft) => {
+      if (!Array.isArray(draft.chars)) return;
+
+      const liveCss = draft.chars.join("");
+      const nextCss = ensureRoomStyleScaffold(liveCss);
+      const scaffoldSplice = computeTextSplice(liveCss, nextCss);
+
+      if (scaffoldSplice) {
+        draft.chars.splice(
+          scaffoldSplice.index,
+          scaffoldSplice.deleteCount,
+          ...scaffoldSplice.insert.split(""),
+        );
+      }
+      draft.version = 3;
+    });
+  }, [
+    hasSharedDocument,
+    isLoading,
+    setSharedDocument,
+    sharedCss,
+    sharedDocument.version,
+  ]);
 
   useLayoutEffect(() => {
     if (!hasSharedDocument || isComposingRef.current) return;
@@ -219,7 +249,7 @@ export function StylePanel({ active, name }: StylePanelProps) {
       if (didChange) {
         draft.updatedAt = Date.now();
         draft.updatedBy = name;
-        draft.version = 2;
+        draft.version = 3;
       }
       mergedText = nextText;
     });
@@ -363,7 +393,7 @@ export function StylePanel({ active, name }: StylePanelProps) {
       );
       draft.updatedAt = Date.now();
       draft.updatedBy = name;
-      draft.version = 2;
+      draft.version = 3;
     });
 
     updateEditor(ROOM_STYLE_SCAFFOLD, {

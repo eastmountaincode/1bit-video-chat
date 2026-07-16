@@ -189,11 +189,24 @@ legend {
 }
 
 .grayscale-canvas {
-  aspect-ratio: 4 / 3;
+  --pixel-columns: 4;
+  --pixel-rows: 3;
+  aspect-ratio: var(--pixel-columns) / var(--pixel-rows);
   background: #ffffff;
-  display: block;
-  image-rendering: pixelated;
+  display: grid;
+  grid-template-columns: repeat(var(--pixel-columns), minmax(0, 1fr));
+  grid-template-rows: repeat(var(--pixel-rows), minmax(0, 1fr));
+  overflow: hidden;
   width: 100%;
+}
+
+.grayscale-pixel {
+  background: rgb(
+    var(--pixel-gray, 255) var(--pixel-gray, 255) var(--pixel-gray, 255)
+  );
+  min-height: 0;
+  min-width: 0;
+  pointer-events: none;
 }
 
 .video-tile figcaption {
