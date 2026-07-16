@@ -7,6 +7,7 @@ export const ROOM_STYLE_TARGETS = [
   '[data-room-part="video-field"]',
   '[data-room-part="video-grid"]',
   '[data-room-part="video-card"]',
+  '[data-room-part="video-card"][data-video-side="own"]',
   '[data-room-part="video-frame"]',
   '[data-room-part="video-pixel"]',
   '[data-room-part="video-caption"]',

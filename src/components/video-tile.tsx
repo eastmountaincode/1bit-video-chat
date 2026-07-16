@@ -50,7 +50,11 @@ export function VideoTile({
   const rateLabel = formatPayloadRate(normalizedPayloadRate, isExpired);
 
   return (
-    <figure className="video-tile" data-room-part="video-card">
+    <figure
+      className="video-tile"
+      data-room-part="video-card"
+      data-video-side={isMe ? "own" : "other"}
+    >
       <GrayscaleCanvas frame={frame} />
       <figcaption data-room-part="video-caption">
         <span className="video-caption-name">
