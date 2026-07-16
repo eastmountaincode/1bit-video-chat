@@ -19,9 +19,12 @@ export const ROOM_STYLE_TARGETS = [
   '[data-room-part="message"]',
   '[data-room-part="message"][data-message-side="own"]',
   '[data-room-part="message"][data-message-side="other"]',
-  '[data-room-part="chat-controls"]',
   '[data-room-part="settings"]',
   '[data-room-part="style"]',
+] as const;
+
+const OBSOLETE_ROOM_STYLE_TARGETS = [
+  '[data-room-part="chat-controls"]',
 ] as const;
 
 export const ROOM_STYLE_SCAFFOLD = ROOM_STYLE_TARGETS.map(
@@ -69,7 +72,15 @@ function hasSelectorBlock(css: string, selector: string) {
 }
 
 export function ensureRoomStyleScaffold(css: string) {
-  const limitedCss = css.slice(0, MAX_ROOM_CSS_LENGTH);
+  const normalizedCss = OBSOLETE_ROOM_STYLE_TARGETS.reduce(
+    (currentCss, selector) =>
+      currentCss.replace(
+        new RegExp(`${escapeRegExp(selector)}\\s*\\{[^{}]*\\}\\s*`, "g"),
+        "",
+      ),
+    css,
+  );
+  const limitedCss = normalizedCss.slice(0, MAX_ROOM_CSS_LENGTH);
   const missingBlocks = ROOM_STYLE_TARGETS.filter(
     (selector) => !hasSelectorBlock(limitedCss, selector),
   ).map((selector) => `${selector} {\n  \n}`);

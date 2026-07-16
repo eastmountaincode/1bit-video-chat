@@ -134,7 +134,7 @@ export const ChatPanel = memo(function ChatPanel({ active, name }: ChatPanelProp
         </fieldset>
       </div>
 
-      <div className="chat-control-bar" data-room-part="chat-controls">
+      <div className="chat-control-bar">
         {isMobile && isOpen ? chatForm : null}
         <button
           aria-controls="chat-drawer"
