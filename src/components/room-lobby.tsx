@@ -1,6 +1,7 @@
 "use client";
 
 import { usePageData, usePlayContext } from "@playhtml/react";
+import Image from "next/image";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 
 import {
@@ -86,6 +87,14 @@ export function RoomLobby() {
       <div className="lobby-shell">
         <header className="lobby-header">
           <h1>Telepathy</h1>
+          <Image
+            alt=""
+            className="lobby-mark"
+            height={40}
+            priority
+            src="/icon.svg"
+            width={40}
+          />
         </header>
 
         <fieldset aria-busy={isLoading} className="room-list-fieldset">

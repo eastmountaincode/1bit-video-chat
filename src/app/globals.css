@@ -109,10 +109,23 @@ legend {
   width: min(100%, 38rem);
 }
 
+.lobby-header {
+  align-items: center;
+  display: flex;
+  gap: 0.75rem;
+  justify-self: start;
+}
+
 .lobby-header h1 {
   margin: 0;
   font-size: 2rem;
   font-weight: normal;
+}
+
+.lobby-mark {
+  display: block;
+  height: 2.5rem;
+  width: 2.5rem;
 }
 
 .room-create-form fieldset {
