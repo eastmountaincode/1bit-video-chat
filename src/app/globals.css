@@ -173,38 +173,6 @@ legend {
   inline-size: 1.25em;
 }
 
-.room-list-loading-dots span {
-  animation: room-list-loading-dot 1.2s infinite;
-  opacity: 0.2;
-}
-
-.room-list-loading-dots span:nth-child(2) {
-  animation-delay: 0.15s;
-}
-
-.room-list-loading-dots span:nth-child(3) {
-  animation-delay: 0.3s;
-}
-
-@keyframes room-list-loading-dot {
-  0%,
-  20%,
-  100% {
-    opacity: 0.2;
-  }
-
-  40% {
-    opacity: 1;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .room-list-loading-dots span {
-    animation: none;
-    opacity: 1;
-  }
-}
-
 .room-list {
   list-style: none;
   margin: 0;
