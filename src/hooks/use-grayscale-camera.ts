@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 
 import type { CaptureSettings } from "@/lib/capture-settings";
 import { DEFAULT_CAPTURE_SETTINGS } from "@/lib/capture-settings";
-import { packGrayscaleFrame } from "@/lib/grayscale-frame";
+import { createGrayscaleFrameEncoder } from "@/lib/grayscale-frame";
 import type { GrayscaleFrame } from "@/lib/shared-types";
 
 export function useGrayscaleCamera(
@@ -29,6 +29,11 @@ export function useGrayscaleCamera(
     canvas.width = width;
     canvas.height = height;
     context.imageSmoothingEnabled = false;
+    const encodeFrame = createGrayscaleFrameEncoder(
+      width,
+      height,
+      grayscaleBits,
+    );
     video.autoplay = true;
     video.muted = true;
     video.playsInline = true;
@@ -81,12 +86,7 @@ export function useGrayscaleCamera(
         context.restore();
 
         const image = context.getImageData(0, 0, width, height);
-        const nextFrame = packGrayscaleFrame(
-          image.data,
-          width,
-          height,
-          grayscaleBits,
-        );
+        const nextFrame = encodeFrame(image.data);
 
         if (nextFrame.data !== lastFrameData) {
           lastFrameData = nextFrame.data;

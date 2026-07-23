@@ -1,6 +1,6 @@
 "use client";
 
-import { usePlayContext, usePresence } from "@playhtml/react";
+import { usePageData, usePlayContext } from "@playhtml/react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import {
@@ -9,14 +9,23 @@ import {
 } from "@/components/room-sidebar";
 import { VideoTile } from "@/components/video-tile";
 import { useGrayscaleCamera } from "@/hooks/use-grayscale-camera";
+import { useVideoPresence } from "@/hooks/use-video-presence";
 import {
   DEFAULT_CAPTURE_SETTINGS,
+  getAdaptiveCaptureSettings,
+  getPixelOverlayCellBudget,
   type CaptureSettings,
 } from "@/lib/capture-settings";
-import type {
-  VideoPayloadRate,
-  VideoPresence,
-} from "@/lib/shared-types";
+import {
+  DEFAULT_COLLABORATIVE_ROOM_STYLE,
+  DEFAULT_ROOM_STYLE,
+  roomStyleUsesLivePixelMetadata,
+  roomStyleUsesVideoPixelOverlay,
+  ROOM_STYLE_SCAFFOLD,
+  type CollaborativeRoomStyleData,
+  type RoomStyleData,
+} from "@/lib/room-style";
+import type { VideoPayloadRate } from "@/lib/shared-types";
 import {
   measureVideoPayloadBytes,
   recordVideoPayloadSample,
@@ -27,28 +36,62 @@ import {
 interface VideoRoomProps {
   name: string;
   onLeave: () => void;
+  roomName: string;
   stream: MediaStream;
 }
 
-interface VideoPresenceView {
-  isMe: boolean;
-  video?: VideoPresence;
-}
-
-export function VideoRoom({ name, onLeave, stream }: VideoRoomProps) {
+export function VideoRoom({ name, onLeave, roomName, stream }: VideoRoomProps) {
   const [captureSettings, setCaptureSettings] = useState<CaptureSettings>(
     DEFAULT_CAPTURE_SETTINGS,
   );
   const [activePanel, setActivePanel] = useState<SidebarPanel>("chat");
-  const frame = useGrayscaleCamera(stream, captureSettings);
   const { isLoading } = usePlayContext();
-  const { presences, setMyPresence } = usePresence<VideoPresence>("video");
+  const {
+    connectionState,
+    error: videoConnectionError,
+    participantCount,
+    participants: remoteParticipants,
+    publishFrame,
+    serverMaxHz,
+  } = useVideoPresence({ enabled: !isLoading, name });
+  const [legacyStyle] = usePageData<RoomStyleData>(
+    "room-style:v1",
+    DEFAULT_ROOM_STYLE,
+  );
+  const [sharedStyle] = usePageData<CollaborativeRoomStyleData>(
+    "room-style:v2",
+    DEFAULT_COLLABORATIVE_ROOM_STYLE,
+  );
+  const sharedCss = Array.isArray(sharedStyle.chars)
+    ? sharedStyle.chars.join("")
+    : typeof legacyStyle.css === "string"
+      ? legacyStyle.css
+      : ROOM_STYLE_SCAFFOLD;
+  const livePixelMetadata = useMemo(
+    () => roomStyleUsesLivePixelMetadata(sharedCss),
+    [sharedCss],
+  );
+  const pixelOverlayEnabled = useMemo(
+    () => roomStyleUsesVideoPixelOverlay(sharedCss),
+    [sharedCss],
+  );
+  const effectiveCaptureSettings = useMemo(
+    () =>
+      getAdaptiveCaptureSettings(captureSettings, participantCount, {
+        livePixelMetadata,
+        name,
+        serverMaxHz,
+      }),
+    [captureSettings, livePixelMetadata, name, participantCount, serverMaxHz],
+  );
+  const maxPixelCells = pixelOverlayEnabled
+    ? getPixelOverlayCellBudget(participantCount)
+    : undefined;
+  const frame = useGrayscaleCamera(stream, effectiveCaptureSettings);
   const payloadSamplesRef = useRef<VideoPayloadSample[]>([]);
+  const lastPayloadRateUiUpdateRef = useRef(0);
   const [localPayloadRate, setLocalPayloadRate] =
     useState<VideoPayloadRate | null>(null);
-  const setVideoPresence = setMyPresence as (
-    value: VideoPresence | null,
-  ) => void;
 
   useEffect(() => {
     if (!frame || isLoading) return;
@@ -57,7 +100,7 @@ export function VideoRoom({ name, onLeave, stream }: VideoRoomProps) {
     const payloadWindow = recordVideoPayloadSample(
       payloadSamplesRef.current,
       performance.now(),
-      measureVideoPayloadBytes({ frame, name }),
+      measureVideoPayloadBytes(frame),
     );
     const payloadRate: VideoPayloadRate = {
       bytesPerSecond: payloadWindow.bytesPerSecond,
@@ -66,16 +109,12 @@ export function VideoRoom({ name, onLeave, stream }: VideoRoomProps) {
     };
 
     payloadSamplesRef.current = payloadWindow.samples;
-    setLocalPayloadRate(payloadRate);
-    setVideoPresence({ frame, name, payloadRate });
-  }, [frame, isLoading, name, setVideoPresence]);
-
-  useEffect(
-    () => () => {
-      if (!isLoading) setVideoPresence(null);
-    },
-    [isLoading, setVideoPresence],
-  );
+    if (measuredAt - lastPayloadRateUiUpdateRef.current >= 500) {
+      lastPayloadRateUiUpdateRef.current = measuredAt;
+      setLocalPayloadRate(payloadRate);
+    }
+    publishFrame(frame);
+  }, [frame, isLoading, publishFrame]);
 
   useEffect(() => {
     let isHelperKeyDown = false;
@@ -136,44 +175,49 @@ export function VideoRoom({ name, onLeave, stream }: VideoRoomProps) {
     };
   }, []);
 
-  const remoteParticipants = useMemo(
-    () =>
-      [...presences.entries()].flatMap(([id, rawPresence]) => {
-        const presence = rawPresence as unknown as VideoPresenceView;
-        if (presence.isMe || !presence.video) return [];
-        return [{ id, ...presence.video }];
-      }),
-    [presences],
-  );
-
-  const participantCount = remoteParticipants.length + 1;
-
   return (
-    <main className="room-shell" data-room-part="room">
+    <main
+      className="room-shell"
+      data-room-part="room"
+      data-video-connection={connectionState}
+    >
       <section className="video-column" data-room-part="video-area">
         <fieldset className="video-fieldset" data-room-part="video-field">
-          <legend>video ({participantCount})</legend>
+          <legend>
+            {roomName} video ({participantCount})
+          </legend>
           <button
             className="leave-button"
             data-room-part="leave"
             onClick={onLeave}
             type="button"
           >
-            leave
+            leave room
           </button>
+          {videoConnectionError ? (
+            <p className="video-connection-note" role="status">
+              {videoConnectionError}
+            </p>
+          ) : null}
           <div className="video-grid" data-room-part="video-grid">
             <VideoTile
               frame={frame}
               isMe
+              livePixelMetadata={livePixelMetadata}
+              maxPixelCells={maxPixelCells}
               name={name}
               payloadRate={localPayloadRate}
+              pixelOverlayEnabled={pixelOverlayEnabled}
             />
             {remoteParticipants.map((participant) => (
               <VideoTile
                 frame={participant.frame}
                 key={participant.id}
+                livePixelMetadata={livePixelMetadata}
+                maxPixelCells={maxPixelCells}
                 name={participant.name}
                 payloadRate={participant.payloadRate}
+                pixelOverlayEnabled={pixelOverlayEnabled}
               />
             ))}
           </div>
@@ -182,9 +226,12 @@ export function VideoRoom({ name, onLeave, stream }: VideoRoomProps) {
       <RoomSidebar
         activePanel={activePanel}
         captureSettings={captureSettings}
+        effectiveCaptureSettings={effectiveCaptureSettings}
         name={name}
         onCaptureSettingsChange={setCaptureSettings}
         onPanelChange={setActivePanel}
+        participantCount={participantCount}
+        roomName={roomName}
       />
     </main>
   );

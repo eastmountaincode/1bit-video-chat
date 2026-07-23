@@ -5,12 +5,17 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "benchmark:transport": "node --experimental-strip-types scripts/video-presence-load-test.mjs",
+    "benchmark:transport:smoke": "node --experimental-strip-types scripts/video-presence-load-test.mjs --profile=smoke",
+    "benchmark:transport:soak": "node --experimental-strip-types scripts/video-presence-load-test.mjs --profile=soak",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test": "node --experimental-strip-types --test src/lib/*.test.ts"
   },
   "dependencies": {
     "@playhtml/react": "^2.0.1",
     "next": "16.2.10",
+    "partysocket": "^1.3.0",
     "playhtml": "^2.13.1",
     "react": "19.2.7",
     "react-dom": "19.2.7"

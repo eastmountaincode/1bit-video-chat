@@ -96,6 +96,98 @@ legend {
   padding: 1rem;
 }
 
+.lobby-page {
+  display: grid;
+  min-height: 100svh;
+  place-items: start center;
+  padding: clamp(1rem, 6vw, 4rem) 1rem;
+}
+
+.lobby-shell {
+  display: grid;
+  gap: 1rem;
+  width: min(100%, 38rem);
+}
+
+.lobby-header h1 {
+  margin: 0;
+  font-size: 2rem;
+  font-weight: normal;
+}
+
+.room-create-form fieldset {
+  display: grid;
+  gap: 0.75rem;
+  margin: 0;
+  padding: 0.75rem;
+}
+
+.room-name-field {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.room-create-form button {
+  justify-self: end;
+}
+
+.room-create-toggle {
+  justify-self: start;
+}
+
+.lobby-note {
+  color: var(--muted);
+  margin: -0.5rem 0 0;
+}
+
+.lobby-error {
+  color: #8b0000;
+}
+
+.room-list-fieldset {
+  margin: 0;
+  padding: 0.25rem 0.75rem 0.5rem;
+}
+
+.room-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.room-list li {
+  align-items: baseline;
+  display: flex;
+  gap: 1rem;
+  justify-content: space-between;
+  margin-inline: -0.35rem;
+  padding: 0.55rem 0.35rem;
+}
+
+.room-list li + li {
+  border-top: 1px solid #cccccc;
+}
+
+.room-list strong {
+  overflow-wrap: anywhere;
+}
+
+.room-join-link {
+  align-items: center;
+  background: #efefef;
+  border: 1px solid #000000;
+  color: inherit;
+  display: inline-flex;
+  flex: none;
+  min-height: 1.75rem;
+  padding: 0.125rem 0.5rem;
+  text-decoration: none;
+}
+
+.room-join-link:active {
+  background: #dddddd;
+}
+
 .join-form {
   width: min(100%, 30rem);
 }
@@ -107,19 +199,15 @@ legend {
   padding: 1rem;
 }
 
-.permission-list {
+.room-back-link,
+.camera-status {
   margin: 0;
 }
 
-.permission-list div {
-  display: flex;
-  justify-content: space-between;
-  gap: 1rem;
-}
-
-.permission-list dt,
-.permission-list dd {
-  margin: 0;
+.room-back-link a {
+  align-items: baseline;
+  display: inline-flex;
+  gap: 0.35rem;
 }
 
 .preview-frame,
@@ -176,6 +264,12 @@ legend {
   top: 0.5rem;
 }
 
+.video-connection-note {
+  color: #8b0000;
+  font-size: 0.85rem;
+  margin: 0.25rem 5rem 0.5rem 0;
+}
+
 .video-grid {
   display: grid;
   gap: 0.75rem;
@@ -185,28 +279,56 @@ legend {
 
 .video-tile {
   border: 1px solid #000000;
+  contain: layout paint style;
   min-width: 0;
 }
 
 .grayscale-canvas {
+  --frame-columns: 4;
+  --frame-rows: 3;
   --pixel-columns: 4;
   --pixel-rows: 3;
-  aspect-ratio: var(--pixel-columns) / var(--pixel-rows);
+  aspect-ratio: var(--frame-columns) / var(--frame-rows);
   background: #ffffff;
+  contain: layout paint style;
   display: grid;
   grid-template-columns: repeat(var(--pixel-columns), minmax(0, 1fr));
   grid-template-rows: repeat(var(--pixel-rows), minmax(0, 1fr));
+  isolation: isolate;
   overflow: hidden;
+  position: relative;
   width: 100%;
 }
 
+.grayscale-canvas-backing {
+  height: 100%;
+  inset: 0;
+  position: absolute;
+  width: 100%;
+}
+
+.grayscale-canvas-backing {
+  display: block;
+  image-rendering: pixelated;
+}
+
+.grayscale-canvas[data-pixel-source="cells"]
+  .grayscale-canvas-backing {
+  visibility: hidden;
+}
+
 .grayscale-pixel {
-  background: rgb(
-    var(--pixel-gray, 255) var(--pixel-gray, 255) var(--pixel-gray, 255)
-  );
+  background-color: currentColor;
+  color: transparent;
   min-height: 0;
   min-width: 0;
   pointer-events: none;
+}
+
+.grayscale-pixel-live {
+  color: rgb(
+    var(--pixel-gray, 255) var(--pixel-gray, 255) var(--pixel-gray, 255)
+  );
 }
 
 .video-tile figcaption {
@@ -251,6 +373,15 @@ legend {
 .room-site-title {
   margin: 0;
   text-align: right;
+}
+
+.room-current-name {
+  font-size: 0.9rem;
+  margin: -0.45rem 0 0;
+  overflow: hidden;
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .sidebar-tabs {
@@ -341,7 +472,7 @@ legend {
   align-items: center;
   display: grid;
   gap: 0.35rem;
-  grid-template-columns: 4.75rem minmax(0, 1fr) 4.5rem;
+  grid-template-columns: 4.75rem minmax(0, 1fr) minmax(7rem, auto);
 }
 
 .settings-panel label + label {
@@ -357,6 +488,12 @@ legend {
 
 .settings-panel output {
   text-align: right;
+}
+
+.settings-room-limit {
+  color: var(--muted);
+  font-size: 0.8rem;
+  margin: 0.75rem 0 0;
 }
 
 .style-panel {
@@ -413,6 +550,10 @@ legend {
   .room-site-title {
     margin-left: auto;
     order: 2;
+  }
+
+  .room-current-name {
+    display: none;
   }
 
   .sidebar-tabs {

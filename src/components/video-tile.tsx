@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
 
 import { GrayscaleCanvas } from "@/components/grayscale-canvas";
 import type {
@@ -15,38 +15,142 @@ import {
 interface VideoTileProps {
   frame: GrayscaleFrame | null;
   isMe?: boolean;
+  livePixelMetadata?: boolean;
+  maxPixelCells?: number;
   name: string;
   payloadRate?: VideoPayloadRate | null;
+  pixelOverlayEnabled?: boolean;
+  renderWhenOffscreen?: boolean;
 }
 
-export function VideoTile({
+export const VideoTile = memo(function VideoTile({
   frame,
   isMe = false,
+  livePixelMetadata = false,
+  maxPixelCells,
   name,
   payloadRate,
+  pixelOverlayEnabled = true,
+  renderWhenOffscreen = false,
 }: VideoTileProps) {
   const normalizedPayloadRate = normalizeVideoPayloadRate(payloadRate);
   const measurementId = normalizedPayloadRate?.measuredAt ?? null;
-  const remainingLifetime = normalizedPayloadRate
-    ? getVideoPayloadRateLifetime(normalizedPayloadRate)
-    : 0;
+  const measurementWindow = normalizedPayloadRate?.windowMs ?? null;
+  const measuredBytesPerSecond =
+    normalizedPayloadRate?.bytesPerSecond ?? null;
+  const expiry = useMemo(() => {
+    if (
+      measurementId === null ||
+      measurementWindow === null ||
+      measuredBytesPerSecond === null
+    ) {
+      return null;
+    }
+
+    const remainingLifetime = getVideoPayloadRateLifetime(
+      {
+        bytesPerSecond: measuredBytesPerSecond,
+        measuredAt: measurementId,
+        windowMs: measurementWindow,
+      },
+    );
+    return {
+      expiresAt: Date.now() + remainingLifetime,
+      measurementId,
+      remainingLifetime,
+    };
+  }, [measuredBytesPerSecond, measurementId, measurementWindow]);
+  const expiryTargetRef = useRef<{
+    expiresAt: number;
+    measurementId: number;
+  } | null>(null);
+  const expiryTimerRef = useRef<number | null>(null);
+  const expiryTimerDueAtRef = useRef<number | null>(null);
   const [expiredMeasurementId, setExpiredMeasurementId] = useState<
     number | null
   >(null);
 
   useEffect(() => {
-    if (measurementId === null || remainingLifetime <= 0) return;
+    if (!expiry) {
+      expiryTargetRef.current = null;
+      if (expiryTimerRef.current !== null) {
+        window.clearTimeout(expiryTimerRef.current);
+        expiryTimerRef.current = null;
+        expiryTimerDueAtRef.current = null;
+      }
+      return;
+    }
 
-    const expiryTimer = window.setTimeout(() => {
-      setExpiredMeasurementId(measurementId);
-    }, remainingLifetime);
+    expiryTargetRef.current = {
+      expiresAt: expiry.expiresAt,
+      measurementId: expiry.measurementId,
+    };
 
-    return () => window.clearTimeout(expiryTimer);
-  }, [measurementId, remainingLifetime]);
+    if (expiry.remainingLifetime <= 0) {
+      if (expiryTimerRef.current !== null) {
+        window.clearTimeout(expiryTimerRef.current);
+        expiryTimerRef.current = null;
+        expiryTimerDueAtRef.current = null;
+      }
+      setExpiredMeasurementId(expiry.measurementId);
+      return;
+    }
+
+    if (expiryTimerRef.current !== null) {
+      if ((expiryTimerDueAtRef.current ?? Infinity) <= expiry.expiresAt) {
+        return;
+      }
+
+      window.clearTimeout(expiryTimerRef.current);
+      expiryTimerRef.current = null;
+      expiryTimerDueAtRef.current = null;
+    }
+
+    function checkExpiry() {
+      const target = expiryTargetRef.current;
+      if (!target) {
+        expiryTimerRef.current = null;
+        expiryTimerDueAtRef.current = null;
+        return;
+      }
+
+      const remainingLifetime = target.expiresAt - Date.now();
+      if (remainingLifetime > 0) {
+        expiryTimerDueAtRef.current = target.expiresAt;
+        expiryTimerRef.current = window.setTimeout(
+          checkExpiry,
+          remainingLifetime,
+        );
+        return;
+      }
+
+      expiryTimerRef.current = null;
+      expiryTimerDueAtRef.current = null;
+      setExpiredMeasurementId(target.measurementId);
+    }
+
+    expiryTimerDueAtRef.current = expiry.expiresAt;
+    expiryTimerRef.current = window.setTimeout(
+      checkExpiry,
+      expiry.remainingLifetime,
+    );
+  }, [expiry]);
+
+  useEffect(
+    () => () => {
+      if (expiryTimerRef.current !== null) {
+        window.clearTimeout(expiryTimerRef.current);
+      }
+      expiryTimerRef.current = null;
+      expiryTimerDueAtRef.current = null;
+    },
+    [],
+  );
 
   const isExpired =
     measurementId !== null &&
-    (remainingLifetime <= 0 || expiredMeasurementId === measurementId);
+    ((expiry?.remainingLifetime ?? 0) <= 0 ||
+      expiredMeasurementId === measurementId);
   const rateLabel = formatPayloadRate(normalizedPayloadRate, isExpired);
 
   return (
@@ -55,7 +159,13 @@ export function VideoTile({
       data-room-part="video-card"
       data-video-side={isMe ? "own" : "other"}
     >
-      <GrayscaleCanvas frame={frame} />
+      <GrayscaleCanvas
+        frame={frame}
+        livePixelMetadata={livePixelMetadata}
+        maxPixelCells={maxPixelCells}
+        pixelOverlayEnabled={pixelOverlayEnabled}
+        renderWhenOffscreen={renderWhenOffscreen}
+      />
       <figcaption data-room-part="video-caption">
         <span className="video-caption-name">
           {name}
@@ -72,6 +182,54 @@ export function VideoTile({
         </span>
       </figcaption>
     </figure>
+  );
+}, areVideoTilePropsEqual);
+
+function areVideoTilePropsEqual(
+  previous: VideoTileProps,
+  next: VideoTileProps,
+) {
+  return (
+    previous.name === next.name &&
+    Boolean(previous.isMe) === Boolean(next.isMe) &&
+    Boolean(previous.livePixelMetadata) ===
+      Boolean(next.livePixelMetadata) &&
+    previous.maxPixelCells === next.maxPixelCells &&
+    (previous.pixelOverlayEnabled ?? true) ===
+      (next.pixelOverlayEnabled ?? true) &&
+    Boolean(previous.renderWhenOffscreen) ===
+      Boolean(next.renderWhenOffscreen) &&
+    framesEqual(previous.frame, next.frame) &&
+    payloadRatesEqual(previous.payloadRate, next.payloadRate)
+  );
+}
+
+function framesEqual(
+  previous: GrayscaleFrame | null,
+  next: GrayscaleFrame | null,
+) {
+  if (previous === next) return true;
+  if (!previous || !next) return false;
+
+  return (
+    previous.bits === next.bits &&
+    previous.data === next.data &&
+    previous.height === next.height &&
+    previous.width === next.width
+  );
+}
+
+function payloadRatesEqual(
+  previous: VideoPayloadRate | null | undefined,
+  next: VideoPayloadRate | null | undefined,
+) {
+  if (previous === next) return true;
+  if (!previous || !next) return false;
+
+  return (
+    previous.bytesPerSecond === next.bytesPerSecond &&
+    previous.measuredAt === next.measuredAt &&
+    previous.windowMs === next.windowMs
   );
 }
 

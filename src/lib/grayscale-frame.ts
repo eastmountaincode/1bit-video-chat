@@ -1,5 +1,40 @@
-import { DEFAULT_CAPTURE_SETTINGS } from "@/lib/capture-settings";
-import type { GrayscaleFrame } from "@/lib/shared-types";
+import { DEFAULT_CAPTURE_SETTINGS } from "./capture-settings.ts";
+import type { GrayscaleFrame } from "./shared-types.ts";
+
+const MAX_FRAME_WIDTH = 216;
+const MAX_FRAME_HEIGHT = 162;
+const GRAYSCALE_LEVELS = Array.from({ length: 5 }, (_, index) => {
+  const bitCount = index + 1;
+  const maximumLevel = (1 << bitCount) - 1;
+
+  return Uint8Array.from({ length: maximumLevel + 1 }, (_, level) =>
+    Math.round((level / maximumLevel) * 255),
+  );
+});
+
+export function createGrayscaleFrameEncoder(
+  width = DEFAULT_CAPTURE_SETTINGS.width,
+  height = DEFAULT_CAPTURE_SETTINGS.height,
+  grayscaleBits = DEFAULT_CAPTURE_SETTINGS.grayscaleBits,
+) {
+  const { bitCount, pixelCount } = validateFrameShape(
+    width,
+    height,
+    grayscaleBits,
+  );
+  const packed = new Uint8Array(Math.ceil((pixelCount * bitCount) / 8));
+  const luminanceLevels = createLuminanceLevels(bitCount);
+
+  return (pixels: Uint8ClampedArray) =>
+    packGrayscaleFrameInto(
+      pixels,
+      width,
+      height,
+      bitCount,
+      packed,
+      luminanceLevels,
+    );
+}
 
 export function packGrayscaleFrame(
   pixels: Uint8ClampedArray,
@@ -7,10 +42,39 @@ export function packGrayscaleFrame(
   height = DEFAULT_CAPTURE_SETTINGS.height,
   grayscaleBits = DEFAULT_CAPTURE_SETTINGS.grayscaleBits,
 ): GrayscaleFrame {
-  const pixelCount = width * height;
-  const bitCount = Math.max(1, Math.min(5, Math.round(grayscaleBits)));
+  const { bitCount, pixelCount } = validateFrameShape(
+    width,
+    height,
+    grayscaleBits,
+  );
   const packed = new Uint8Array(Math.ceil((pixelCount * bitCount) / 8));
-  const maximumQuantizedLevel = (1 << bitCount) - 1;
+  return packGrayscaleFrameInto(
+    pixels,
+    width,
+    height,
+    bitCount,
+    packed,
+    createLuminanceLevels(bitCount),
+  );
+}
+
+function packGrayscaleFrameInto(
+  pixels: Uint8ClampedArray,
+  width: number,
+  height: number,
+  bitCount: number,
+  packed: Uint8Array,
+  luminanceLevels: Uint8Array,
+): GrayscaleFrame {
+  const pixelCount = width * height;
+
+  if (pixels.length < pixelCount * 4) {
+    throw new RangeError("Not enough RGBA pixels for grayscale frame");
+  }
+
+  let accumulator = 0;
+  let accumulatorBits = 0;
+  let packedIndex = 0;
 
   for (let pixelIndex = 0; pixelIndex < pixelCount; pixelIndex += 1) {
     const rgbaIndex = pixelIndex * 4;
@@ -19,53 +83,57 @@ export function packGrayscaleFrame(
         pixels[rgbaIndex + 1] * 183 +
         pixels[rgbaIndex + 2] * 19) >>
       8;
-    const quantizedLevel = Math.round(
-      (luminance / 255) * maximumQuantizedLevel,
-    );
-    const bitOffset = pixelIndex * bitCount;
+    accumulator =
+      (accumulator << bitCount) | luminanceLevels[luminance];
+    accumulatorBits += bitCount;
 
-    for (let bitIndex = 0; bitIndex < bitCount; bitIndex += 1) {
-      const absoluteBit = bitOffset + bitIndex;
-      const value =
-        (quantizedLevel >> (bitCount - bitIndex - 1)) & 1;
-      packed[absoluteBit >> 3] |= value << (7 - (absoluteBit & 7));
+    if (accumulatorBits >= 8) {
+      accumulatorBits -= 8;
+      packed[packedIndex] = (accumulator >> accumulatorBits) & 0xff;
+      packedIndex += 1;
+      accumulator &= (1 << accumulatorBits) - 1;
     }
   }
 
-  let binary = "";
-  for (const byte of packed) {
-    binary += String.fromCharCode(byte);
+  if (accumulatorBits > 0) {
+    packed[packedIndex] = (accumulator << (8 - accumulatorBits)) & 0xff;
   }
 
   return {
     bits: bitCount,
-    data: window.btoa(binary),
+    data: globalThis.btoa(String.fromCharCode(...packed)),
     height,
     width,
   };
 }
 
-export function unpackGrayscaleFrame(frame: GrayscaleFrame): ImageData {
-  const binary = window.atob(frame.data);
-  const image = new ImageData(frame.width, frame.height);
-  const pixelCount = frame.width * frame.height;
-  const bitCount = Math.max(1, Math.min(5, Math.round(frame.bits ?? 4)));
-  const maximumQuantizedLevel = (1 << bitCount) - 1;
+export function unpackGrayscaleFrame(
+  frame: GrayscaleFrame,
+  reusableImage?: ImageData,
+): ImageData {
+  const { binary, bitCount, height, pixelCount, width } =
+    validatePackedGrayscaleFrame(frame);
+  const image =
+    reusableImage?.width === width && reusableImage.height === height
+      ? reusableImage
+      : new ImageData(width, height);
+  const grayscaleLevels = GRAYSCALE_LEVELS[bitCount - 1];
+  let accumulator = 0;
+  let accumulatorBits = 0;
+  let byteIndex = 0;
 
   for (let pixelIndex = 0; pixelIndex < pixelCount; pixelIndex += 1) {
-    const bitOffset = pixelIndex * bitCount;
-    let quantizedLevel = 0;
-
-    for (let bitIndex = 0; bitIndex < bitCount; bitIndex += 1) {
-      const absoluteBit = bitOffset + bitIndex;
-      const byte = binary.charCodeAt(absoluteBit >> 3);
-      const bit = (byte >> (7 - (absoluteBit & 7))) & 1;
-      quantizedLevel = (quantizedLevel << 1) | bit;
+    while (accumulatorBits < bitCount) {
+      accumulator = (accumulator << 8) | binary.charCodeAt(byteIndex);
+      accumulatorBits += 8;
+      byteIndex += 1;
     }
 
-    const value = Math.round(
-      (quantizedLevel / maximumQuantizedLevel) * 255,
-    );
+    accumulatorBits -= bitCount;
+    const quantizedLevel =
+      (accumulator >> accumulatorBits) & ((1 << bitCount) - 1);
+    accumulator &= (1 << accumulatorBits) - 1;
+    const value = grayscaleLevels[quantizedLevel];
     const rgbaIndex = pixelIndex * 4;
 
     image.data[rgbaIndex] = value;
@@ -75,4 +143,81 @@ export function unpackGrayscaleFrame(frame: GrayscaleFrame): ImageData {
   }
 
   return image;
+}
+
+function createLuminanceLevels(bitCount: number) {
+  const maximumLevel = (1 << bitCount) - 1;
+
+  return Uint8Array.from({ length: 256 }, (_, luminance) =>
+    Math.round((luminance / 255) * maximumLevel),
+  );
+}
+
+function validateFrameShape(
+  width: number,
+  height: number,
+  grayscaleBits: number,
+) {
+  const bitCount = Math.max(1, Math.min(5, Math.round(grayscaleBits)));
+
+  if (
+    !Number.isInteger(width) ||
+    width <= 0 ||
+    width > MAX_FRAME_WIDTH ||
+    !Number.isInteger(height) ||
+    height <= 0 ||
+    height > MAX_FRAME_HEIGHT
+  ) {
+    throw new RangeError("Invalid grayscale frame dimensions");
+  }
+
+  return { bitCount, pixelCount: width * height };
+}
+
+function validatePackedGrayscaleFrame(frame: GrayscaleFrame) {
+  const width = frame?.width;
+  const height = frame?.height;
+  const bitCount = frame?.bits ?? 4;
+  const data = frame?.data;
+
+  if (
+    !Number.isInteger(width) ||
+    width <= 0 ||
+    width > MAX_FRAME_WIDTH ||
+    !Number.isInteger(height) ||
+    height <= 0 ||
+    height > MAX_FRAME_HEIGHT
+  ) {
+    throw new RangeError("Invalid grayscale frame dimensions");
+  }
+
+  if (!Number.isInteger(bitCount) || bitCount < 1 || bitCount > 5) {
+    throw new RangeError("Invalid grayscale frame bit depth");
+  }
+
+  if (typeof data !== "string") {
+    throw new TypeError("Invalid grayscale frame data");
+  }
+
+  const pixelCount = width * height;
+  const expectedByteLength = Math.ceil((pixelCount * bitCount) / 8);
+  const expectedBase64Length = 4 * Math.ceil(expectedByteLength / 3);
+
+  if (data.length !== expectedBase64Length) {
+    throw new RangeError("Invalid grayscale frame payload length");
+  }
+
+  let binary: string;
+
+  try {
+    binary = globalThis.atob(data);
+  } catch {
+    throw new TypeError("Invalid grayscale frame Base64 data");
+  }
+
+  if (binary.length !== expectedByteLength) {
+    throw new RangeError("Invalid decoded grayscale frame length");
+  }
+
+  return { binary, bitCount, height, pixelCount, width };
 }

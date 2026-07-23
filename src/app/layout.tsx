@@ -5,7 +5,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Telepathy",
-  description: "A shared low-resolution grayscale video room.",
+  description: "Shared low-resolution grayscale video rooms.",
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {

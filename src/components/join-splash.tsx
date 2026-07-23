@@ -42,16 +42,24 @@ export function JoinSplash({
         <fieldset>
           <legend>Telepathy</legend>
 
-          <dl className="permission-list">
-            <div>
-              <dt>camera</dt>
-              <dd>{permissionLabels[permission]}</dd>
-            </div>
-          </dl>
+          <p className="room-back-link">
+            {/* A document navigation cannot carry this room's PlayHTML transport into the lobby. */}
+            {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
+            <a href="/">
+              <span aria-hidden="true">←</span> Back to room selection
+            </a>
+          </p>
+
+          <p className="camera-status">
+            Camera: {permissionLabels[permission]}
+          </p>
 
           {stream ? (
             <figure className="preview-frame">
-              <GrayscaleCanvas frame={frame} />
+              <GrayscaleCanvas
+                frame={frame}
+                pixelOverlayEnabled={false}
+              />
             </figure>
           ) : null}
 

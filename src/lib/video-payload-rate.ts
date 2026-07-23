@@ -1,6 +1,6 @@
 import type {
+  GrayscaleFrame,
   VideoPayloadRate,
-  VideoPresence,
 } from "@/lib/shared-types";
 
 export const VIDEO_PAYLOAD_RATE_WINDOW_MS = 1_000;
@@ -18,17 +18,14 @@ export interface VideoPayloadWindow {
   samples: VideoPayloadSample[];
 }
 
-const textEncoder = new TextEncoder();
-
 /**
- * Counts the UTF-8 bytes in the video value we give PlayHTML. The rate field
- * itself is omitted so the meter does not measure its own telemetry. PlayHTML
- * does not expose its Yjs, WebSocket, TLS, or TCP overhead.
+ * Counts the Base64-encoded video bytes. Frame metadata and PlayHTML's
+ * WebSocket, TLS, and TCP overhead are intentionally excluded, so this can be
+ * measured independently by the sender and every receiver.
  */
-export function measureVideoPayloadBytes(
-  payload: Pick<VideoPresence, "frame" | "name">,
-) {
-  return textEncoder.encode(JSON.stringify(payload)).byteLength;
+export function measureVideoPayloadBytes(frame: GrayscaleFrame) {
+  // Base64 is ASCII, so string length is exactly its UTF-8 byte length.
+  return frame.data.length;
 }
 
 export function recordVideoPayloadSample(

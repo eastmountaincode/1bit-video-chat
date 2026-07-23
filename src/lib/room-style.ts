@@ -91,3 +91,77 @@ export function ensureRoomStyleScaffold(css: string) {
   const availableLength = Math.max(0, MAX_ROOM_CSS_LENGTH - suffix.length);
   return `${limitedCss.slice(0, availableLength).trimEnd()}${suffix}`;
 }
+
+/**
+ * Per-frame pixel metadata is expensive to maintain across a large room. Most
+ * room styles only need the stable pixel selectors/coordinates, so the video
+ * renderer enables live level values only when the shared CSS asks for them.
+ */
+export function roomStyleUsesLivePixelMetadata(css: string) {
+  const uncommentedCss = stripCssComments(css);
+
+  if (/--pixel-(?:gray|level)\b|data-pixel-level/i.test(uncommentedCss)) {
+    return true;
+  }
+
+  for (const rule of uncommentedCss.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+    const [, selector = "", declarations = ""] = rule;
+    if (!isVideoPixelSelector(selector)) continue;
+
+    if (pixelRuleNeedsSourceCells(declarations)) return true;
+  }
+
+  return false;
+}
+
+function pixelRuleNeedsSourceCells(declarations: string) {
+  for (const declaration of declarations.matchAll(
+    /(?:^|;)\s*([\w-]+)\s*:/g,
+  )) {
+    const property = (declaration[1] ?? "").toLowerCase();
+    if (!property || property.startsWith("--")) continue;
+
+    const paintsOverlayWithoutSourceCells =
+      property === "color" ||
+      property === "box-shadow" ||
+      property === "text-shadow" ||
+      property === "cursor" ||
+      property === "pointer-events" ||
+      property === "user-select" ||
+      property === "touch-action" ||
+      property === "caret-color" ||
+      property === "accent-color" ||
+      property === "border" ||
+      (property.startsWith("background-") || property === "background") ||
+      (property.startsWith("outline-") || property === "outline") ||
+      (property.startsWith("border-") &&
+        !property.startsWith("border-radius"));
+
+    if (!paintsOverlayWithoutSourceCells) return true;
+  }
+
+  return false;
+}
+
+/** Avoid mounting thousands of style-only spans until room CSS uses them. */
+export function roomStyleUsesVideoPixelOverlay(css: string) {
+  const uncommentedCss = stripCssComments(css);
+  const withoutEmptyScaffoldBlock = uncommentedCss.replace(
+    /\[data-room-part\s*=\s*(?:["']video-pixel["']|video-pixel)\]\s*\{\s*\}/gi,
+    "",
+  );
+
+  return /\[data-room-part\s*=\s*(?:["']video-pixel["']|video-pixel)\]|data-pixel-(?:index|x|y|level)|--pixel-(?:index|x|y|level|gray)\b|\.grayscale-pixel\b/i.test(
+    withoutEmptyScaffoldBlock,
+  );
+}
+
+function isVideoPixelSelector(selector: string) {
+  return /\[data-room-part\s*=\s*(?:["']video-pixel["']|video-pixel)\]|data-pixel-(?:index|x|y|level)|\.grayscale-pixel\b/i.test(
+    selector,
+  );
+}
+
+function stripCssComments(css: string) {
+  return css.replace(/\/\*[\s\S]*?\*\//g, "");
+}

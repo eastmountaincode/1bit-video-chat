@@ -11,9 +11,12 @@ export type SidebarPanel = "chat" | "settings" | "style";
 interface RoomSidebarProps {
   activePanel: SidebarPanel;
   captureSettings: CaptureSettings;
+  effectiveCaptureSettings: CaptureSettings;
   name: string;
   onCaptureSettingsChange: (settings: CaptureSettings) => void;
   onPanelChange: (panel: SidebarPanel) => void;
+  participantCount: number;
+  roomName: string;
 }
 
 const panels: SidebarPanel[] = ["chat", "settings", "style"];
@@ -21,9 +24,12 @@ const panels: SidebarPanel[] = ["chat", "settings", "style"];
 export function RoomSidebar({
   activePanel,
   captureSettings,
+  effectiveCaptureSettings,
   name,
   onCaptureSettingsChange,
   onPanelChange,
+  participantCount,
+  roomName,
 }: RoomSidebarProps) {
   const isMobile = useMobileLayout();
 
@@ -42,6 +48,7 @@ export function RoomSidebar({
         <p className="room-site-title" data-room-part="title">
           Telepathy
         </p>
+        <p className="room-current-name">{roomName}</p>
         <nav aria-label="Room panels" className="sidebar-tabs" data-room-part="sidebar-tabs">
           {panels.map((panel) => (
             <button
@@ -61,7 +68,9 @@ export function RoomSidebar({
         <ChatPanel active={activePanel === "chat"} name={name} />
         <HelperPanel
           active={activePanel === "settings"}
+          effectiveSettings={effectiveCaptureSettings}
           onChange={onCaptureSettingsChange}
+          participantCount={participantCount}
           settings={captureSettings}
         />
         <StylePanel active={activePanel === "style"} name={name} />
