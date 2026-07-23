@@ -88,73 +88,81 @@ export function RoomLobby() {
           <h1>Telepathy</h1>
         </header>
 
-        {isLoading ? (
-          <p className="lobby-note" role="status">
-            Connecting to the room list…
-          </p>
-        ) : null}
-
-        <fieldset className="room-list-fieldset">
+        <fieldset aria-busy={isLoading} className="room-list-fieldset">
           <legend>Rooms</legend>
-          <ul className="room-list">
-            {rooms.map((room) => (
-              <li key={room.id}>
-                <strong>{room.name}</strong>
-                {/* A fresh document guarantees a fresh PlayHTML room transport. */}
-                <a
-                  aria-label={`Join ${room.name}`}
-                  className="room-join-link"
-                  href={getRoomHref(room)}
-                >
-                  Join
-                </a>
-              </li>
-            ))}
-          </ul>
+          {isLoading ? (
+            <p className="room-list-loading" role="status">
+              Connecting to the room list
+              <span
+                aria-hidden="true"
+                className="room-list-loading-dots"
+              >
+                <span>.</span>
+                <span>.</span>
+                <span>.</span>
+              </span>
+            </p>
+          ) : (
+            <ul className="room-list">
+              {rooms.map((room) => (
+                <li key={room.id}>
+                  <strong>{room.name}</strong>
+                  {/* A fresh document guarantees a fresh PlayHTML room transport. */}
+                  <a
+                    aria-label={`Join ${room.name}`}
+                    className="room-join-link"
+                    href={getRoomHref(room)}
+                  >
+                    Join
+                  </a>
+                </li>
+              ))}
+            </ul>
+          )}
         </fieldset>
 
-        {isCreateOpen ? (
-          <form
-            className="room-create-form"
-            id="room-create-form"
-            onSubmit={handleSubmit}
-          >
-            <fieldset disabled={pendingRoom !== null}>
-              <legend>Create a room</legend>
-              <label className="room-name-field">
-                Room name
-                <input
-                  autoComplete="off"
-                  autoFocus
-                  maxLength={ROOM_NAME_MAX_LENGTH}
-                  onChange={(event) => setName(event.target.value)}
-                  value={name}
-                />
-              </label>
-              <button
-                disabled={
-                  isLoading ||
-                  isAtCapacity ||
-                  !normalizedName ||
-                  pendingRoom !== null
-                }
-                type="submit"
-              >
-                {pendingRoom ? "Creating…" : "Create room"}
-              </button>
-            </fieldset>
-          </form>
-        ) : (
-          <button
-            aria-controls="room-create-form"
-            aria-expanded="false"
-            className="room-create-toggle"
-            onClick={() => setIsCreateOpen(true)}
-            type="button"
-          >
-            Create a room
-          </button>
-        )}
+        {!isLoading &&
+          (isCreateOpen ? (
+            <form
+              className="room-create-form"
+              id="room-create-form"
+              onSubmit={handleSubmit}
+            >
+              <fieldset disabled={pendingRoom !== null}>
+                <legend>Create a room</legend>
+                <label className="room-name-field">
+                  Room name
+                  <input
+                    autoComplete="off"
+                    autoFocus
+                    maxLength={ROOM_NAME_MAX_LENGTH}
+                    onChange={(event) => setName(event.target.value)}
+                    value={name}
+                  />
+                </label>
+                <button
+                  disabled={
+                    isAtCapacity ||
+                    !normalizedName ||
+                    pendingRoom !== null
+                  }
+                  type="submit"
+                >
+                  {pendingRoom ? "Creating…" : "Create room"}
+                </button>
+              </fieldset>
+            </form>
+          ) : (
+            <button
+              aria-controls="room-create-form"
+              aria-expanded="false"
+              className="room-create-toggle"
+              onClick={() => setIsCreateOpen(true)}
+              type="button"
+            >
+              Create a room
+            </button>
+          ))}
 
         {error ? (
           <p className="lobby-note lobby-error" role="alert">
