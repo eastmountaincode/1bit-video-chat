@@ -54,14 +54,12 @@ export function JoinSplash({
             Camera: {permissionLabels[permission]}
           </p>
 
-          {stream ? (
-            <figure className="preview-frame">
-              <GrayscaleCanvas
-                frame={frame}
-                pixelOverlayEnabled={false}
-              />
-            </figure>
-          ) : null}
+          <figure className="preview-frame">
+            <GrayscaleCanvas
+              frame={frame}
+              pixelOverlayEnabled={false}
+            />
+          </figure>
 
           <label className="name-field">
             name

@@ -251,6 +251,18 @@ legend {
 
 .preview-frame {
   border: 1px solid #000000;
+  position: relative;
+}
+
+.preview-frame::after {
+  border-bottom: 1px solid #000000;
+  bottom: 0;
+  content: "";
+  left: 0;
+  pointer-events: none;
+  position: absolute;
+  right: 0;
+  z-index: 1;
 }
 
 .name-field,
