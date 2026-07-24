@@ -68,7 +68,9 @@ export function RoomSidebar({
               </button>
             ))}
           </nav>
-          <p className="room-current-name">Room: {roomName}</p>
+          <p className="room-current-name">
+            room: <strong>{roomName}</strong>
+          </p>
         </div>
         {videoConnectionStatus ? (
           <p className="video-connection-note" role="status">

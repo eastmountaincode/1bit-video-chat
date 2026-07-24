@@ -422,7 +422,6 @@ legend {
 
 .room-current-name {
   flex: 1 1 8rem;
-  font-size: 0.9rem;
   margin: 0;
   min-width: 0;
   overflow: hidden;
