@@ -25,7 +25,7 @@ import {
   type CollaborativeRoomStyleData,
   type RoomStyleData,
 } from "@/lib/room-style";
-import type { GrayscaleFrame, VideoPayloadRate } from "@/lib/shared-types";
+import type { VideoPayloadRate } from "@/lib/shared-types";
 import {
   measureVideoPayloadBytes,
   recordVideoPayloadSample,
@@ -36,46 +36,24 @@ import {
 interface VideoRoomProps {
   name: string;
   onLeave: () => void;
-  previewMode?: "video-reconnecting";
   roomName: string;
-  stream: MediaStream | null;
+  stream: MediaStream;
 }
 
-const RECONNECTING_PREVIEW_FRAME: GrayscaleFrame = {
-  bits: 4,
-  data:
-    "NEVWZnd3ZmVUQ0RVZnd3d3dmVURFVmd4iIiHdmVURWZ3iJmZiHdmVFVneJmaqZmHdlVVZ4iSqqopiHZVVmeJkru7KZh2ZVZniZK8yymYdmVWZ4mau7upmHZlVWeImqqqqYh2VVVneJMzMzmHdlVFZneImZmId2ZURVZneIiIh3ZlVERVZnd3d3dmVUQ0RVZmd3dmZVRD",
-  height: 15,
-  width: 20,
-};
-
-export function VideoRoom({
-  name,
-  onLeave,
-  previewMode,
-  roomName,
-  stream,
-}: VideoRoomProps) {
+export function VideoRoom({ name, onLeave, roomName, stream }: VideoRoomProps) {
   const [captureSettings, setCaptureSettings] = useState<CaptureSettings>(
     DEFAULT_CAPTURE_SETTINGS,
   );
   const [activePanel, setActivePanel] = useState<SidebarPanel>("chat");
   const { isLoading } = usePlayContext();
   const {
-    connectionState: liveConnectionState,
+    connectionState,
     error: videoConnectionError,
     participantCount,
     participants: remoteParticipants,
     publishFrame,
     serverMaxHz,
-  } = useVideoPresence({
-    enabled: !isLoading && previewMode === undefined,
-    name,
-  });
-  const connectionState =
-    previewMode === "video-reconnecting"
-      ? "reconnecting"
-      : liveConnectionState;
+  } = useVideoPresence({ enabled: !isLoading, name });
   const videoConnectionStatus =
     connectionState === "reconnecting"
       ? "Video connection: reconnecting... Sending and receiving video is paused."
@@ -113,18 +91,14 @@ export function VideoRoom({
   const maxPixelCells = pixelOverlayEnabled
     ? getPixelOverlayCellBudget(participantCount)
     : undefined;
-  const cameraFrame = useGrayscaleCamera(stream, effectiveCaptureSettings);
-  const frame =
-    previewMode === "video-reconnecting"
-      ? RECONNECTING_PREVIEW_FRAME
-      : cameraFrame;
+  const frame = useGrayscaleCamera(stream, effectiveCaptureSettings);
   const payloadSamplesRef = useRef<VideoPayloadSample[]>([]);
   const lastPayloadRateUiUpdateRef = useRef(0);
   const [localPayloadRate, setLocalPayloadRate] =
     useState<VideoPayloadRate | null>(null);
 
   useEffect(() => {
-    if (!frame || isLoading || previewMode !== undefined) return;
+    if (!frame || isLoading) return;
 
     const measuredAt = Date.now();
     const payloadWindow = recordVideoPayloadSample(
@@ -144,7 +118,7 @@ export function VideoRoom({
       setLocalPayloadRate(payloadRate);
     }
     publishFrame(frame);
-  }, [frame, isLoading, previewMode, publishFrame]);
+  }, [frame, isLoading, publishFrame]);
 
   useEffect(() => {
     let isHelperKeyDown = false;
