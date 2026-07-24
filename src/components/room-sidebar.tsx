@@ -17,6 +17,7 @@ interface RoomSidebarProps {
   onPanelChange: (panel: SidebarPanel) => void;
   participantCount: number;
   roomName: string;
+  videoConnectionStatus: string | null;
 }
 
 const panels: SidebarPanel[] = ["chat", "settings", "style"];
@@ -30,6 +31,7 @@ export function RoomSidebar({
   onPanelChange,
   participantCount,
   roomName,
+  videoConnectionStatus,
 }: RoomSidebarProps) {
   const isMobile = useMobileLayout();
 
@@ -48,20 +50,31 @@ export function RoomSidebar({
         <p className="room-site-title" data-room-part="title">
           Telepathy
         </p>
-        <p className="room-current-name">{roomName}</p>
-        <nav aria-label="Room panels" className="sidebar-tabs" data-room-part="sidebar-tabs">
-          {panels.map((panel) => (
-            <button
-              aria-pressed={activePanel === panel}
-              className={`sidebar-tab sidebar-tab-${panel}`}
-              key={panel}
-              onClick={() => selectPanel(panel)}
-              type="button"
-            >
-              {panel}
-            </button>
-          ))}
-        </nav>
+        <div className="room-sidebar-toolbar">
+          <nav
+            aria-label="Room panels"
+            className="sidebar-tabs"
+            data-room-part="sidebar-tabs"
+          >
+            {panels.map((panel) => (
+              <button
+                aria-pressed={activePanel === panel}
+                className={`sidebar-tab sidebar-tab-${panel}`}
+                key={panel}
+                onClick={() => selectPanel(panel)}
+                type="button"
+              >
+                {panel}
+              </button>
+            ))}
+          </nav>
+          <p className="room-current-name">Room: {roomName}</p>
+        </div>
+        {videoConnectionStatus ? (
+          <p className="video-connection-note" role="status">
+            {videoConnectionStatus}
+          </p>
+        ) : null}
       </header>
 
       <div className="sidebar-panels">

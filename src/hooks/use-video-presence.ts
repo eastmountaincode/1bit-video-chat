@@ -241,13 +241,16 @@ export function useVideoPresence({
     }
 
     function handleClose() {
-      if (!disposed) setConnectionState("reconnecting");
+      if (!disposed) {
+        setConnectionState("reconnecting");
+        setError(null);
+      }
     }
 
     function handleError() {
       if (!disposed) {
         setConnectionState("reconnecting");
-        setError("The video connection was interrupted; reconnecting.");
+        setError(null);
       }
     }
 

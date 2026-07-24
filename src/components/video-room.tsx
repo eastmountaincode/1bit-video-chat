@@ -25,7 +25,7 @@ import {
   type CollaborativeRoomStyleData,
   type RoomStyleData,
 } from "@/lib/room-style";
-import type { VideoPayloadRate } from "@/lib/shared-types";
+import type { GrayscaleFrame, VideoPayloadRate } from "@/lib/shared-types";
 import {
   measureVideoPayloadBytes,
   recordVideoPayloadSample,
@@ -36,24 +36,50 @@ import {
 interface VideoRoomProps {
   name: string;
   onLeave: () => void;
+  previewMode?: "video-reconnecting";
   roomName: string;
-  stream: MediaStream;
+  stream: MediaStream | null;
 }
 
-export function VideoRoom({ name, onLeave, roomName, stream }: VideoRoomProps) {
+const RECONNECTING_PREVIEW_FRAME: GrayscaleFrame = {
+  bits: 4,
+  data:
+    "NEVWZnd3ZmVUQ0RVZnd3d3dmVURFVmd4iIiHdmVURWZ3iJmZiHdmVFVneJmaqZmHdlVVZ4iSqqopiHZVVmeJkru7KZh2ZVZniZK8yymYdmVWZ4mau7upmHZlVWeImqqqqYh2VVVneJMzMzmHdlVFZneImZmId2ZURVZneIiIh3ZlVERVZnd3d3dmVUQ0RVZmd3dmZVRD",
+  height: 15,
+  width: 20,
+};
+
+export function VideoRoom({
+  name,
+  onLeave,
+  previewMode,
+  roomName,
+  stream,
+}: VideoRoomProps) {
   const [captureSettings, setCaptureSettings] = useState<CaptureSettings>(
     DEFAULT_CAPTURE_SETTINGS,
   );
   const [activePanel, setActivePanel] = useState<SidebarPanel>("chat");
   const { isLoading } = usePlayContext();
   const {
-    connectionState,
+    connectionState: liveConnectionState,
     error: videoConnectionError,
     participantCount,
     participants: remoteParticipants,
     publishFrame,
     serverMaxHz,
-  } = useVideoPresence({ enabled: !isLoading, name });
+  } = useVideoPresence({
+    enabled: !isLoading && previewMode === undefined,
+    name,
+  });
+  const connectionState =
+    previewMode === "video-reconnecting"
+      ? "reconnecting"
+      : liveConnectionState;
+  const videoConnectionStatus =
+    connectionState === "reconnecting"
+      ? "Video connection: reconnecting... Sending and receiving video is paused."
+      : videoConnectionError;
   const [legacyStyle] = usePageData<RoomStyleData>(
     "room-style:v1",
     DEFAULT_ROOM_STYLE,
@@ -87,14 +113,18 @@ export function VideoRoom({ name, onLeave, roomName, stream }: VideoRoomProps) {
   const maxPixelCells = pixelOverlayEnabled
     ? getPixelOverlayCellBudget(participantCount)
     : undefined;
-  const frame = useGrayscaleCamera(stream, effectiveCaptureSettings);
+  const cameraFrame = useGrayscaleCamera(stream, effectiveCaptureSettings);
+  const frame =
+    previewMode === "video-reconnecting"
+      ? RECONNECTING_PREVIEW_FRAME
+      : cameraFrame;
   const payloadSamplesRef = useRef<VideoPayloadSample[]>([]);
   const lastPayloadRateUiUpdateRef = useRef(0);
   const [localPayloadRate, setLocalPayloadRate] =
     useState<VideoPayloadRate | null>(null);
 
   useEffect(() => {
-    if (!frame || isLoading) return;
+    if (!frame || isLoading || previewMode !== undefined) return;
 
     const measuredAt = Date.now();
     const payloadWindow = recordVideoPayloadSample(
@@ -114,7 +144,7 @@ export function VideoRoom({ name, onLeave, roomName, stream }: VideoRoomProps) {
       setLocalPayloadRate(payloadRate);
     }
     publishFrame(frame);
-  }, [frame, isLoading, publishFrame]);
+  }, [frame, isLoading, previewMode, publishFrame]);
 
   useEffect(() => {
     let isHelperKeyDown = false;
@@ -183,9 +213,7 @@ export function VideoRoom({ name, onLeave, roomName, stream }: VideoRoomProps) {
     >
       <section className="video-column" data-room-part="video-area">
         <fieldset className="video-fieldset" data-room-part="video-field">
-          <legend>
-            {roomName} video ({participantCount})
-          </legend>
+          <legend>video ({participantCount})</legend>
           <button
             className="leave-button"
             data-room-part="leave"
@@ -194,11 +222,6 @@ export function VideoRoom({ name, onLeave, roomName, stream }: VideoRoomProps) {
           >
             leave room
           </button>
-          {videoConnectionError ? (
-            <p className="video-connection-note" role="status">
-              {videoConnectionError}
-            </p>
-          ) : null}
           <div className="video-grid" data-room-part="video-grid">
             <VideoTile
               frame={frame}
@@ -232,6 +255,7 @@ export function VideoRoom({ name, onLeave, roomName, stream }: VideoRoomProps) {
         onPanelChange={setActivePanel}
         participantCount={participantCount}
         roomName={roomName}
+        videoConnectionStatus={videoConnectionStatus}
       />
     </main>
   );
