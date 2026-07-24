@@ -30,7 +30,11 @@ import {
   type CollaborativeRoomStyleData,
   type RoomStyleData,
 } from "@/lib/room-style";
-import { changeTextIndentation } from "@/lib/text-indentation";
+import {
+  changeTextIndentation,
+  insertLineBreakWithIndentation,
+  type TextIndentationEdit,
+} from "@/lib/text-indentation";
 
 interface StylePanelProps {
   active: boolean;
@@ -262,6 +266,21 @@ export function StylePanel({ active, name }: StylePanelProps) {
     return commitSplices(before, localSplice ? [localSplice] : []);
   }
 
+  function applyKeyboardEdit(before: string, edit: TextIndentationEdit) {
+    if (edit.value.length > MAX_ROOM_CSS_LENGTH) return;
+
+    compositionFinalValueRef.current = null;
+    compositionResultRef.current = null;
+    const mergedText = commitSplices(before, edit.splices);
+    const mergedSelection = mapSelectionThroughTextChanges(
+      edit.value,
+      mergedText,
+      edit.selection,
+    );
+
+    updateEditor(mergedText, mergedSelection);
+  }
+
   function handleEditorChange(event: ChangeEvent<HTMLTextAreaElement>) {
     const nextValue = event.currentTarget.value;
     const nextSelection = readSelection(event.currentTarget);
@@ -302,6 +321,32 @@ export function StylePanel({ active, name }: StylePanelProps) {
       return;
     }
 
+    if (event.key === "Enter") {
+      allowNextTabToLeaveRef.current = false;
+
+      if (
+        event.altKey ||
+        event.ctrlKey ||
+        event.metaKey ||
+        event.nativeEvent.isComposing ||
+        isComposingRef.current
+      ) {
+        return;
+      }
+
+      const before = editorValueRef.current;
+      const indentationEdit = insertLineBreakWithIndentation(
+        before,
+        readSelection(event.currentTarget),
+        MAX_ROOM_CSS_LENGTH,
+      );
+      if (indentationEdit.value.length > MAX_ROOM_CSS_LENGTH) return;
+
+      event.preventDefault();
+      applyKeyboardEdit(before, indentationEdit);
+      return;
+    }
+
     if (event.key !== "Tab") {
       if (!["Alt", "Control", "Meta", "Shift"].includes(event.key)) {
         allowNextTabToLeaveRef.current = false;
@@ -328,24 +373,14 @@ export function StylePanel({ active, name }: StylePanelProps) {
     event.preventDefault();
 
     const before = editorValueRef.current;
-    const indentationEdit = changeTextIndentation(
+    applyKeyboardEdit(
       before,
-      readSelection(event.currentTarget),
-      event.shiftKey,
+      changeTextIndentation(
+        before,
+        readSelection(event.currentTarget),
+        event.shiftKey,
+      ),
     );
-
-    if (indentationEdit.value.length > MAX_ROOM_CSS_LENGTH) return;
-
-    compositionFinalValueRef.current = null;
-    compositionResultRef.current = null;
-    const mergedText = commitSplices(before, indentationEdit.splices);
-    const mergedSelection = mapSelectionThroughTextChanges(
-      indentationEdit.value,
-      mergedText,
-      indentationEdit.selection,
-    );
-
-    updateEditor(mergedText, mergedSelection);
   }
 
   function handleCompositionStart() {
@@ -433,8 +468,8 @@ export function StylePanel({ active, name }: StylePanelProps) {
           value={editorValue}
         />
         <span className="visually-hidden" id={editorInstructionsId}>
-          Tab indents; Shift+Tab outdents. Press Escape, then Tab to leave the
-          editor.
+          Enter keeps the current indentation. Tab indents; Shift+Tab
+          outdents. Press Escape, then Tab to leave the editor.
         </span>
         <div className="style-panel-footer">
           <output>

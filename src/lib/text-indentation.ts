@@ -3,7 +3,7 @@ import {
   mapSelectionThroughSplice,
   type TextSelection,
   type TextSplice,
-} from "@/lib/collaborative-text";
+} from "./collaborative-text.ts";
 
 export const CSS_INDENT = "  ";
 
@@ -46,6 +46,30 @@ export function changeTextIndentation(
     .reverse();
 
   return applySplices(value, selection, splices);
+}
+
+export function insertLineBreakWithIndentation(
+  value: string,
+  selection: TextSelection,
+  maxLength = Number.POSITIVE_INFINITY,
+): TextIndentationEdit {
+  const lineStart = value.lastIndexOf("\n", selection.start - 1) + 1;
+  const textBeforeSelection = value.slice(lineStart, selection.start);
+  const indentation = /^[\t ]*/.exec(textBeforeSelection)?.[0] ?? "";
+  const deleteCount = selection.end - selection.start;
+  const availableInsertLength = Math.max(
+    0,
+    maxLength - (value.length - deleteCount),
+  );
+  const insert = `\n${indentation}`.slice(0, availableInsertLength);
+
+  return applySplices(value, selection, [
+    {
+      index: selection.start,
+      deleteCount,
+      insert,
+    },
+  ]);
 }
 
 function applySplices(
