@@ -105,7 +105,6 @@ export function RoomLobby() {
     <main className="lobby-page">
       <div className="lobby-shell">
         <header className="lobby-header">
-          <h1>Telepathy</h1>
           <Image
             alt=""
             className="lobby-mark"
@@ -114,6 +113,7 @@ export function RoomLobby() {
             src="/icon.svg"
             width={40}
           />
+          <h1>Telepathy</h1>
         </header>
 
         <fieldset aria-busy={isLoading} className="room-list-fieldset">

@@ -233,8 +233,15 @@ legend {
 
 .room-back-link a {
   align-items: baseline;
+  color: inherit;
   display: inline-flex;
   gap: 0.35rem;
+  text-decoration: none;
+}
+
+.room-back-link a:hover,
+.room-back-link a:focus-visible {
+  text-decoration: underline;
 }
 
 .preview-frame,
