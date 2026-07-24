@@ -1,57 +1,113 @@
 "use client";
 
-import { usePageData, usePlayContext } from "@playhtml/react";
 import Image from "next/image";
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 
 import {
-  addRoomToDirectory,
-  createPublicRoom,
-  DEFAULT_ROOM_DIRECTORY,
   getPublicRooms,
   getRoomHref,
   MAX_PUBLIC_ROOMS,
   normalizeRoomName,
-  ROOM_DIRECTORY_DATA_KEY,
+  parsePublicRoom,
   ROOM_NAME_MAX_LENGTH,
   type PublicRoom,
-  type RoomDirectoryData,
 } from "@/lib/room-directory";
+import { ROOM_LIST_REFRESH_MS } from "@/lib/room-lifecycle";
 
-const NAVIGATION_GRACE_MS = 120;
+const ROOM_REQUEST_TIMEOUT_MS = 8_000;
 
 export function RoomLobby() {
-  const [directory, setDirectory] = usePageData<RoomDirectoryData>(
-    ROOM_DIRECTORY_DATA_KEY,
-    DEFAULT_ROOM_DIRECTORY,
-  );
-  const { isLoading } = usePlayContext();
+  const createRequestRef = useRef<AbortController | null>(null);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isCreating, setIsCreating] = useState(false);
+  const [listError, setListError] = useState<string | null>(null);
   const [name, setName] = useState("");
-  const [pendingRoom, setPendingRoom] = useState<PublicRoom | null>(null);
-  const rooms = useMemo(() => getPublicRooms(directory), [directory]);
+  const [rooms, setRooms] = useState<PublicRoom[] | null>(null);
   const normalizedName = normalizeRoomName(name);
-  const isAtCapacity = rooms.length >= MAX_PUBLIC_ROOMS;
+  const isAtCapacity = !rooms || rooms.length >= MAX_PUBLIC_ROOMS;
 
   useEffect(() => {
-    if (!pendingRoom || !rooms.some((room) => room.id === pendingRoom.id)) {
-      return;
+    let activeRequest: AbortController | null = null;
+    let stopped = false;
+
+    async function refreshRooms() {
+      if (activeRequest || stopped) return;
+
+      const controller = new AbortController();
+      activeRequest = controller;
+      const timeout = window.setTimeout(
+        () => controller.abort(),
+        ROOM_REQUEST_TIMEOUT_MS,
+      );
+
+      try {
+        const response = await fetch("/api/rooms", {
+          signal: controller.signal,
+        });
+        const body = await readJsonObject(response);
+        if (!Array.isArray(body?.rooms)) {
+          throw new Error("The room list is unavailable.");
+        }
+
+        if (!stopped) {
+          setRooms(getPublicRooms(body.rooms));
+          setListError(
+            response.ok
+              ? null
+              : typeof body.error === "string"
+                ? body.error
+                : "New rooms are temporarily unavailable.",
+          );
+        }
+      } catch {
+        if (!stopped) {
+          setRooms((currentRooms) => currentRooms ?? getPublicRooms([]));
+          setListError("New rooms are temporarily unavailable.");
+        }
+      } finally {
+        window.clearTimeout(timeout);
+        if (activeRequest === controller) activeRequest = null;
+      }
     }
 
-    const navigationTimer = window.setTimeout(() => {
-      window.location.assign(getRoomHref(pendingRoom));
-    }, NAVIGATION_GRACE_MS);
+    function refreshVisibleRooms() {
+      if (document.visibilityState === "visible") void refreshRooms();
+    }
 
-    return () => window.clearTimeout(navigationTimer);
-  }, [pendingRoom, rooms]);
+    void refreshRooms();
+    const refreshTimer = window.setInterval(
+      refreshVisibleRooms,
+      ROOM_LIST_REFRESH_MS,
+    );
+    window.addEventListener("focus", refreshVisibleRooms);
+    document.addEventListener("visibilitychange", refreshVisibleRooms);
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    return () => {
+      stopped = true;
+      activeRequest?.abort();
+      window.clearInterval(refreshTimer);
+      window.removeEventListener("focus", refreshVisibleRooms);
+      document.removeEventListener("visibilitychange", refreshVisibleRooms);
+    };
+  }, []);
+
+  useEffect(
+    () => () => {
+      const controller = createRequestRef.current;
+      createRequestRef.current = null;
+      controller?.abort();
+    },
+    [],
+  );
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (createRequestRef.current) return;
     setError(null);
 
-    if (isLoading) {
-      setError("The room list is still connecting.");
+    if (!rooms) {
+      setError("The room list is unavailable.");
       return;
     }
     if (!normalizedName) {
@@ -63,23 +119,48 @@ export function RoomLobby() {
       return;
     }
 
-    const room = createPublicRoom(name, crypto.randomUUID(), Date.now());
-    if (!room) {
-      setError("That room name could not be used.");
-      return;
+    setIsCreating(true);
+    const controller = new AbortController();
+    createRequestRef.current = controller;
+    const timeout = window.setTimeout(
+      () => controller.abort(),
+      ROOM_REQUEST_TIMEOUT_MS,
+    );
+
+    try {
+      const response = await fetch("/api/rooms", {
+        body: JSON.stringify({ name }),
+        cache: "no-store",
+        headers: { "Content-Type": "application/json" },
+        method: "POST",
+        signal: controller.signal,
+      });
+      const body = await readJsonObject(response);
+      const room = parsePublicRoom(body?.room);
+
+      if (!response.ok || !room) {
+        if (createRequestRef.current === controller) {
+          setError(
+            typeof body?.error === "string"
+              ? body.error
+              : "The room could not be created.",
+          );
+        }
+        return;
+      }
+
+      window.location.assign(getRoomHref(room));
+    } catch {
+      if (createRequestRef.current === controller) {
+        setError("The room could not be created.");
+      }
+    } finally {
+      window.clearTimeout(timeout);
+      if (createRequestRef.current === controller) {
+        createRequestRef.current = null;
+        setIsCreating(false);
+      }
     }
-
-    let added = false;
-    setDirectory((draft) => {
-      added = addRoomToDirectory(draft, room);
-    });
-
-    if (!added) {
-      setError("The room could not be added. Try again.");
-      return;
-    }
-
-    setPendingRoom(room);
   }
 
   return (
@@ -97,9 +178,12 @@ export function RoomLobby() {
           <h1>Telepathy</h1>
         </header>
 
-        <fieldset aria-busy={isLoading} className="room-list-fieldset">
+        <fieldset
+          aria-busy={rooms === null && listError === null}
+          className="room-list-fieldset"
+        >
           <legend>Rooms</legend>
-          {isLoading ? (
+          {rooms === null && !listError ? (
             <p
               aria-label="Loading rooms"
               className="room-list-loading"
@@ -107,7 +191,7 @@ export function RoomLobby() {
             >
               ...
             </p>
-          ) : (
+          ) : rooms ? (
             <ul className="room-list">
               {rooms.map((room) => (
                 <li key={room.id}>
@@ -123,17 +207,26 @@ export function RoomLobby() {
                 </li>
               ))}
             </ul>
+          ) : (
+            <p role="alert">The room list is unavailable.</p>
           )}
         </fieldset>
 
-        {!isLoading &&
+        {listError ? (
+          <p className="lobby-note" role="status">
+            {listError}
+          </p>
+        ) : null}
+
+        {rooms &&
+          !listError &&
           (isCreateOpen ? (
             <form
               className="room-create-form"
               id="room-create-form"
               onSubmit={handleSubmit}
             >
-              <fieldset disabled={pendingRoom !== null}>
+              <fieldset disabled={isCreating}>
                 <legend>Create a room</legend>
                 <label className="room-name-field">
                   Room name
@@ -149,11 +242,11 @@ export function RoomLobby() {
                   disabled={
                     isAtCapacity ||
                     !normalizedName ||
-                    pendingRoom !== null
+                    isCreating
                   }
                   type="submit"
                 >
-                  {pendingRoom ? "Creating…" : "Create room"}
+                  {isCreating ? "Creating..." : "Create room"}
                 </button>
               </fieldset>
             </form>
@@ -177,4 +270,19 @@ export function RoomLobby() {
       </div>
     </main>
   );
+}
+
+async function readJsonObject(
+  response: Response,
+): Promise<Record<string, unknown> | null> {
+  try {
+    const value: unknown = await response.json();
+    return value !== null &&
+      typeof value === "object" &&
+      !Array.isArray(value)
+      ? (value as Record<string, unknown>)
+      : null;
+  } catch {
+    return null;
+  }
 }

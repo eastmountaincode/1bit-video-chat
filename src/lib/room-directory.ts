@@ -1,5 +1,3 @@
-export const ROOM_DIRECTORY_DATA_KEY = "room-directory:v1";
-export const ROOM_DIRECTORY_VERSION = 1 as const;
 export const ROOM_NAME_MAX_LENGTH = 48;
 export const ROOM_ID_MAX_LENGTH = 64;
 export const MAX_PUBLIC_ROOMS = 100;
@@ -9,10 +7,8 @@ export const PLAYHTML_LEGACY_MAIN_ROOM = "one-bit-video-chat:main:v1";
 
 const ROOM_ID_PATTERN =
   /^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$/;
-const GENERATED_ROOM_SUFFIX_PATTERN = /-[a-f0-9]{12}$/;
 const CONTROL_AND_BIDI_PATTERN =
   /[\u0000-\u001f\u007f-\u009f\u061c\u200e\u200f\u202a-\u202e\u2066-\u2069]/g;
-const MAX_DIRECTORY_RECORDS_TO_SCAN = MAX_PUBLIC_ROOMS * 4;
 const MAX_FUTURE_TIMESTAMP_MS = 5 * 60 * 1_000;
 
 export interface PublicRoom {
@@ -21,20 +17,10 @@ export interface PublicRoom {
   name: string;
 }
 
-export interface RoomDirectoryData {
-  rooms: Record<string, PublicRoom>;
-  version: typeof ROOM_DIRECTORY_VERSION;
-}
-
 export const MAIN_ROOM: PublicRoom = {
   createdAt: 0,
   id: "main",
   name: "Main room",
-};
-
-export const DEFAULT_ROOM_DIRECTORY: RoomDirectoryData = {
-  rooms: { main: MAIN_ROOM },
-  version: ROOM_DIRECTORY_VERSION,
 };
 
 export function normalizeRoomName(value: unknown): string {
@@ -76,54 +62,18 @@ export function createPublicRoom(
   return isValidRoomId(id) ? { createdAt, id, name } : null;
 }
 
-export function addRoomToDirectory(
-  directory: RoomDirectoryData,
-  room: PublicRoom,
-  now = Date.now(),
-): boolean {
-  if (!isValidPublicRoom(room, room.id, now)) return false;
-
-  directory.version = ROOM_DIRECTORY_VERSION;
-  if (
-    !directory.rooms ||
-    typeof directory.rooms !== "object" ||
-    Array.isArray(directory.rooms)
-  ) {
-    directory.rooms = {};
-  }
-
-  if (
-    directory.rooms[room.id] ||
-    getPublicRooms(directory, now).length >= MAX_PUBLIC_ROOMS
-  ) {
-    return false;
-  }
-
-  directory.rooms[room.id] = room;
-  return true;
-}
-
 export function getPublicRooms(
   value: unknown,
   now = Date.now(),
 ): PublicRoom[] {
   const roomsById = new Map<string, PublicRoom>([[MAIN_ROOM.id, MAIN_ROOM]]);
-  const directory = asRecord(value);
-  const rooms = asRecord(directory?.rooms);
 
-  if (rooms) {
-    let scanned = 0;
-
-    for (const id in rooms) {
-      if (!Object.prototype.hasOwnProperty.call(rooms, id)) continue;
-      scanned += 1;
-      if (scanned > MAX_DIRECTORY_RECORDS_TO_SCAN) break;
-
-      const candidate = rooms[id];
-      if (id === MAIN_ROOM.id || !isValidPublicRoom(candidate, id, now)) {
-        continue;
+  if (Array.isArray(value)) {
+    for (const candidate of value.slice(0, MAX_PUBLIC_ROOMS * 4)) {
+      const room = parsePublicRoom(candidate, now);
+      if (room && room.id !== MAIN_ROOM.id) {
+        roomsById.set(room.id, room);
       }
-      roomsById.set(id, candidate);
     }
   }
 
@@ -156,17 +106,23 @@ export function getPlayHtmlRoomForPath(pathname: string): string {
 }
 
 export function getRoomHref(room: PublicRoom): string {
-  return `/rooms/${room.id}?name=${encodeURIComponent(room.name)}`;
+  return `/rooms/${room.id}`;
 }
 
-export function getRoomDisplayName(roomId: string, requestedName: unknown): string {
-  const name = normalizeRoomName(requestedName);
-  if (name) return name;
-  if (roomId === MAIN_ROOM.id) return MAIN_ROOM.name;
+export function parsePublicRoom(
+  value: unknown,
+  now = Date.now(),
+): PublicRoom | null {
+  const record = asRecord(value);
+  if (!record || !isValidRoomId(record.id)) return null;
 
-  const readableId = roomId.replace(GENERATED_ROOM_SUFFIX_PATTERN, "");
-  const words = readableId.replace(/-+/g, " ").trim();
-  return words ? words[0].toUpperCase() + words.slice(1) : "Room";
+  return isValidPublicRoom(record, record.id, now)
+    ? {
+        createdAt: record.createdAt,
+        id: record.id,
+        name: record.name,
+      }
+    : null;
 }
 
 function slugifyRoomName(name: string): string {

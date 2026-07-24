@@ -2,31 +2,33 @@ import { notFound } from "next/navigation";
 
 import { ExpiredRoom } from "@/components/expired-room";
 import { PlayHtmlProvider } from "@/components/play-html-provider";
+import { RoomUnavailable } from "@/components/room-unavailable";
 import { VideoChatApp } from "@/components/video-chat-app";
-import { getRoomDisplayName, isValidRoomId } from "@/lib/room-directory";
+import { isValidRoomId } from "@/lib/room-directory";
+import { getPublicRoom } from "@/lib/redis-room-registry";
+
+export const dynamic = "force-dynamic";
 
 interface RoomPageProps {
   params: Promise<{ roomId: string }>;
-  searchParams: Promise<{
-    name?: string | string[];
-    preview?: string | string[];
-  }>;
 }
 
-export default async function RoomPage({ params, searchParams }: RoomPageProps) {
+export default async function RoomPage({ params }: RoomPageProps) {
   const { roomId } = await params;
   if (!isValidRoomId(roomId)) notFound();
 
-  const { name, preview } = await searchParams;
-  const requestedPreview = Array.isArray(preview) ? preview[0] : preview;
-  if (requestedPreview === "expired") return <ExpiredRoom />;
-
-  const requestedName = Array.isArray(name) ? name[0] : name;
-  const roomName = getRoomDisplayName(roomId, requestedName);
+  let room;
+  try {
+    room = await getPublicRoom(roomId);
+  } catch (error) {
+    console.error("Could not open the room.", error);
+    return <RoomUnavailable />;
+  }
+  if (!room) return <ExpiredRoom />;
 
   return (
     <PlayHtmlProvider>
-      <VideoChatApp roomName={roomName} />
+      <VideoChatApp roomId={room.id} roomName={room.name} />
     </PlayHtmlProvider>
   );
 }

@@ -10,7 +10,8 @@ A silent low-resolution grayscale video chat built with Next.js and PlayHTML.
 - Room style is shared, persistent raw CSS with URL support, stable `data-room-part` targets, a 20,000-character limit, and a global reset.
 - Each viewer can target only their own card with `[data-room-part="video-card"][data-video-side="own"]`.
 - Individual pixels can be targeted through `[data-room-part="video-pixel"]`, with stable `--pixel-x`, `--pixel-y`, and `--pixel-index` values. The overlay mounts only when shared CSS uses pixel styling and is capped at 4,000 cells room-wide; styles that need changing pixel values or geometry also enter a guarded lower-resolution live-cell mode.
-- The PlayHTML-backed lobby lists public rooms and lets anyone create one.
+- The server-backed lobby lists public rooms and lets anyone create one.
+- User-created rooms expire after their last room-page heartbeat, with a two-minute empty-room grace period; Main room remains permanent.
 - Every room has its own isolated video presence, chat, and shared style state.
 - The original shared state remains available in the default Main room.
 - Entering or leaving a room reloads the document so no prior room transport can leak across the boundary.
@@ -22,6 +23,21 @@ A silent low-resolution grayscale video chat built with Next.js and PlayHTML.
 npm install
 npm run dev
 ```
+
+The room server uses Upstash Redis through either
+`KV_REST_API_URL` / `KV_REST_API_TOKEN` or
+`UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN`.
+Set `TELEPATHY_ROOM_REGISTRY_NAMESPACE` to isolate local lifecycle tests.
+
+With the app running, the live room smoke test creates one temporary room,
+sends 20 concurrent heartbeats, and checks missing-room handling:
+
+```bash
+npm run test:rooms:live
+```
+
+Add `-- --wait-for-expiry` to also wait for the room to expire and verify that
+its list entry and URL stop working.
 
 In development, `/benchmark?participants=20&fps=15&style=border&duration=10`
 runs the real tile renderer with mock participants and reports long tasks,

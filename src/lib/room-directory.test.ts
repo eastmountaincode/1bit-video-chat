@@ -2,19 +2,17 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
-  addRoomToDirectory,
   createPublicRoom,
-  DEFAULT_ROOM_DIRECTORY,
   getPlayHtmlRoomForPath,
   getPublicRooms,
-  getRoomDisplayName,
+  getRoomHref,
   isValidRoomId,
   MAIN_ROOM,
   MAX_PUBLIC_ROOMS,
   normalizeRoomName,
+  parsePublicRoom,
   PLAYHTML_LEGACY_MAIN_ROOM,
   PLAYHTML_LOBBY_ROOM,
-  type RoomDirectoryData,
 } from "./room-directory.ts";
 
 test("normalizes public room names without allowing controls or unbounded text", () => {
@@ -51,42 +49,38 @@ test("accepts only strict single-segment room IDs", () => {
   assert.equal(isValidRoomId(`r${"x".repeat(64)}`), false);
 });
 
-test("sanitizes, sorts, deduplicates, and caps the collaborative directory", () => {
+test("sanitizes, sorts, deduplicates, and caps the server room list", () => {
   const now = 10_000;
-  const rooms: Record<string, unknown> = {
-    main: { ...MAIN_ROOM, name: "spoofed" },
-    older: { createdAt: 1_000, id: "older", name: "Older" },
-    newest: { createdAt: 9_000, id: "newest", name: "Newest" },
-    mismatch: { createdAt: 8_000, id: "another-id", name: "Mismatch" },
-    invalid: { createdAt: 7_000, id: "invalid", name: "Bad\nname" },
-  };
+  const rooms: unknown[] = [
+    { ...MAIN_ROOM, name: "spoofed" },
+    { createdAt: 1_000, id: "older", name: "Older" },
+    { createdAt: 9_000, id: "newest", name: "Newest" },
+    { createdAt: 8_000, id: "another-id", name: "Mismatch" },
+    { createdAt: 7_000, id: "invalid", name: "Bad\nname" },
+  ];
 
   for (let index = 0; index < MAX_PUBLIC_ROOMS + 20; index += 1) {
     const id = `room-${String(index).padStart(3, "0")}`;
-    rooms[id] = { createdAt: 2_000 + index, id, name: `Room ${index}` };
+    rooms.push({ createdAt: 2_000 + index, id, name: `Room ${index}` });
   }
 
-  const visible = getPublicRooms({ rooms, version: 1 }, now);
+  const visible = getPublicRooms(rooms, now);
   assert.equal(visible[0], MAIN_ROOM);
   assert.equal(visible[1].id, "newest");
-  assert.equal(visible.some((room) => room.id === "mismatch"), false);
   assert.equal(visible.some((room) => room.id === "invalid"), false);
   assert.equal(visible.length, MAX_PUBLIC_ROOMS);
 });
 
-test("merges concurrent distinct room inserts by map key", () => {
-  const directory: RoomDirectoryData = structuredClone(DEFAULT_ROOM_DIRECTORY);
-  const first = createPublicRoom("First", "1".repeat(12), 1_000);
-  const second = createPublicRoom("Second", "2".repeat(12), 1_001);
-  assert.ok(first);
-  assert.ok(second);
-
-  assert.equal(addRoomToDirectory(directory, first, 2_000), true);
-  assert.equal(addRoomToDirectory(directory, second, 2_000), true);
+test("accepts only complete server room records", () => {
   assert.deepEqual(
-    getPublicRooms(directory, 2_000).map((room) => room.id),
-    ["main", second.id, first.id],
+    parsePublicRoom({ createdAt: 1_000, id: "first", name: "First" }, 2_000),
+    { createdAt: 1_000, id: "first", name: "First" },
   );
+  assert.equal(
+    parsePublicRoom({ createdAt: 1_000, id: "first", name: " First " }, 2_000),
+    null,
+  );
+  assert.equal(parsePublicRoom({ id: "first", name: "First" }, 2_000), null);
 });
 
 test("maps the lobby and every camera route to isolated PlayHTML rooms", () => {
@@ -106,14 +100,14 @@ test("maps the lobby and every camera route to isolated PlayHTML rooms", () => {
   );
 });
 
-test("uses the directory name when present and a readable deep-link fallback", () => {
-  assert.equal(getRoomDisplayName("main", undefined), "Main room");
+test("room links no longer trust a name supplied in the URL", () => {
+  assert.equal(getRoomHref(MAIN_ROOM), "/rooms/main");
   assert.equal(
-    getRoomDisplayName("design-chat-a71d90f42c8b", undefined),
-    "Design chat",
-  );
-  assert.equal(
-    getRoomDisplayName("design-chat-a71d90f42c8b", "  Exact name  "),
-    "Exact name",
+    getRoomHref({
+      createdAt: 1_000,
+      id: "design-chat-a71d90f42c8b",
+      name: "Design chat",
+    }),
+    "/rooms/design-chat-a71d90f42c8b",
   );
 });
