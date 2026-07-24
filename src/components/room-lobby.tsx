@@ -19,25 +19,6 @@ import {
 } from "@/lib/room-directory";
 
 const NAVIGATION_GRACE_MS = 120;
-const LOADING_DOT_INTERVAL_MS = 450;
-
-function LoadingDots() {
-  const [dotCount, setDotCount] = useState(1);
-
-  useEffect(() => {
-    const interval = window.setInterval(() => {
-      setDotCount((current) => (current === 3 ? 1 : current + 1));
-    }, LOADING_DOT_INTERVAL_MS);
-
-    return () => window.clearInterval(interval);
-  }, []);
-
-  return (
-    <span aria-hidden="true" className="room-list-loading-dots">
-      {".".repeat(dotCount)}
-    </span>
-  );
-}
 
 export function RoomLobby() {
   const [directory, setDirectory] = usePageData<RoomDirectoryData>(
@@ -119,9 +100,12 @@ export function RoomLobby() {
         <fieldset aria-busy={isLoading} className="room-list-fieldset">
           <legend>Rooms</legend>
           {isLoading ? (
-            <p className="room-list-loading" role="status">
-              Connecting to the room list
-              <LoadingDots />
+            <p
+              aria-label="Loading rooms"
+              className="room-list-loading"
+              role="status"
+            >
+              ...
             </p>
           ) : (
             <ul className="room-list">

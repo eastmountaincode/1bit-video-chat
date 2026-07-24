@@ -163,14 +163,8 @@ legend {
 }
 
 .room-list-loading {
-  color: var(--muted);
   margin: 0;
   padding: 0.55rem 0.35rem;
-}
-
-.room-list-loading-dots {
-  display: inline-block;
-  inline-size: 1.25em;
 }
 
 .room-list {
