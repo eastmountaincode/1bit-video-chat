@@ -212,17 +212,20 @@ legend {
   background: #dddddd;
 }
 
-.join-form {
+.join-form,
+.room-status {
   width: min(100%, 30rem);
 }
 
-.join-form fieldset {
+.join-form fieldset,
+.room-status fieldset {
   display: grid;
   gap: 1rem;
   margin: 0;
   padding: 1rem;
 }
 
+.room-status p,
 .room-back-link,
 .camera-status {
   margin: 0;
