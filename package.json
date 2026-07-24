@@ -8,6 +8,7 @@
     "benchmark:transport": "node --experimental-strip-types scripts/video-presence-load-test.mjs",
     "benchmark:transport:smoke": "node --experimental-strip-types scripts/video-presence-load-test.mjs --profile=smoke",
     "benchmark:transport:soak": "node --experimental-strip-types scripts/video-presence-load-test.mjs --profile=soak",
+    "benchmark:style-relay": "node --experimental-strip-types scripts/playhtml-style-relay-load-test.mjs",
     "start": "next start",
     "lint": "eslint",
     "test": "node --experimental-strip-types --test src/lib/*.test.ts"
@@ -24,8 +25,11 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@syncedstore/core": "0.6.0",
     "eslint": "^9",
     "eslint-config-next": "16.2.10",
-    "typescript": "^5"
+    "typescript": "^5",
+    "y-partyserver": "2.2.0",
+    "yjs": "13.6.18"
   }
 }

@@ -19,6 +19,7 @@ import {
 import {
   DEFAULT_COLLABORATIVE_ROOM_STYLE,
   DEFAULT_ROOM_STYLE,
+  getCollaborativeRoomStyleCss,
   roomStyleUsesLivePixelMetadata,
   roomStyleUsesVideoPixelOverlay,
   ROOM_STYLE_SCAFFOLD,
@@ -66,11 +67,12 @@ export function VideoRoom({ name, onLeave, roomName, stream }: VideoRoomProps) {
     "room-style:v2",
     DEFAULT_COLLABORATIVE_ROOM_STYLE,
   );
-  const sharedCss = Array.isArray(sharedStyle.chars)
-    ? sharedStyle.chars.join("")
-    : typeof legacyStyle.css === "string"
+  const sharedCss = getCollaborativeRoomStyleCss(
+    sharedStyle,
+    typeof legacyStyle.css === "string"
       ? legacyStyle.css
-      : ROOM_STYLE_SCAFFOLD;
+      : ROOM_STYLE_SCAFFOLD,
+  );
   const livePixelMetadata = useMemo(
     () => roomStyleUsesLivePixelMetadata(sharedCss),
     [sharedCss],

@@ -1,3 +1,8 @@
+import {
+  createTextEntries,
+  readTextEntriesSafely,
+} from "./shared-text-entries.ts";
+
 export const MAX_ROOM_CSS_LENGTH = 20_000;
 
 export const ROOM_STYLE_TARGETS = [
@@ -41,12 +46,24 @@ export interface RoomStyleData {
 export interface CollaborativeRoomStyleData {
   /**
    * UTF-16 code units, matching textarea selection offsets. Null means this
-   * room has not migrated from the legacy scalar CSS document yet.
+   * room has not migrated from the legacy scalar CSS document yet. Retained as
+   * a rolling v3 compatibility mirror while already-open clients age out.
    */
   chars: string[] | null;
+  /**
+   * Replacing this object selects a new document epoch atomically. Its text is
+   * stored as stable-ID UTF-16 entries for identity-safe concurrent editing.
+   */
+  current: RoomStyleDocument | null;
   updatedAt: number;
   updatedBy: string;
-  version: 2 | 3;
+  version: 2 | 3 | 4;
+}
+
+export interface RoomStyleDocument {
+  createdAt: number;
+  entries: string[];
+  id: string;
 }
 
 export const DEFAULT_ROOM_STYLE: RoomStyleData = {
@@ -58,10 +75,44 @@ export const DEFAULT_ROOM_STYLE: RoomStyleData = {
 
 export const DEFAULT_COLLABORATIVE_ROOM_STYLE: CollaborativeRoomStyleData = {
   chars: null,
+  current: null,
   updatedAt: 0,
   updatedBy: "",
   version: 3,
 };
+
+export function getCollaborativeRoomStyleCss(
+  style: CollaborativeRoomStyleData,
+  fallback: string,
+) {
+  if (Array.isArray(style.current?.entries)) {
+    return (
+      readTextEntriesSafely(
+        style.current.entries,
+        MAX_ROOM_CSS_LENGTH,
+      ) ?? fallback
+    );
+  }
+  if (Array.isArray(style.chars)) {
+    return (
+      readLegacyRoomStyleCss(style.chars, MAX_ROOM_CSS_LENGTH) ??
+      fallback
+    );
+  }
+  return fallback;
+}
+
+export function createRoomStyleDocument(
+  css: string,
+  id: string,
+  createdAt: number,
+): RoomStyleDocument {
+  return {
+    createdAt,
+    entries: createTextEntries(css, "b"),
+    id,
+  };
+}
 
 function escapeRegExp(value: string) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -90,6 +141,61 @@ export function ensureRoomStyleScaffold(css: string) {
   const suffix = `\n\n${missingBlocks.join("\n\n")}`;
   const availableLength = Math.max(0, MAX_ROOM_CSS_LENGTH - suffix.length);
   return `${limitedCss.slice(0, availableLength).trimEnd()}${suffix}`;
+}
+
+export function normalizeCollaborativeRoomStyleCss(
+  css: string,
+  version: CollaborativeRoomStyleData["version"],
+) {
+  return version === 4
+    ? css.slice(0, MAX_ROOM_CSS_LENGTH)
+    : ensureRoomStyleScaffold(css);
+}
+
+export function readLegacyRoomStyleCss(
+  characters: unknown[],
+  maxLength = MAX_ROOM_CSS_LENGTH,
+) {
+  const length = Math.min(characters.length, maxLength);
+  let css = "";
+
+  for (let index = 0; index < length; index += 1) {
+    const character = characters[index];
+    if (typeof character !== "string" || character.length !== 1) {
+      return null;
+    }
+    css += character;
+  }
+
+  return css;
+}
+
+export function syncLegacyRoomStyleCharacters(
+  style: CollaborativeRoomStyleData,
+  css: string,
+) {
+  const limitedCss = css.slice(0, MAX_ROOM_CSS_LENGTH);
+  if (!Array.isArray(style.chars)) {
+    style.chars = limitedCss.split("");
+    return true;
+  }
+
+  const currentCss = readLegacyRoomStyleCss(
+    style.chars,
+    MAX_ROOM_CSS_LENGTH,
+  );
+  if (
+    currentCss === limitedCss &&
+    style.chars.length === limitedCss.length
+  ) {
+    return false;
+  }
+
+  // Repairs and resets can run on every connected client at once. Replacing
+  // the property lets Yjs select one complete mirror instead of interleaving
+  // many identical array splices.
+  style.chars = limitedCss.split("");
+  return true;
 }
 
 /**

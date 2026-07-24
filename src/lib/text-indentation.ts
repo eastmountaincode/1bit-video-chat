@@ -55,7 +55,10 @@ export function insertLineBreakWithIndentation(
 ): TextIndentationEdit {
   const lineStart = value.lastIndexOf("\n", selection.start - 1) + 1;
   const textBeforeSelection = value.slice(lineStart, selection.start);
-  const indentation = /^[\t ]*/.exec(textBeforeSelection)?.[0] ?? "";
+  const lineIndentation = /^[\t ]*/.exec(textBeforeSelection)?.[0] ?? "";
+  const indentation = textBeforeSelection.trimEnd().endsWith("{")
+    ? `${lineIndentation}${CSS_INDENT}`
+    : lineIndentation;
   const deleteCount = selection.end - selection.start;
   const availableInsertLength = Math.max(
     0,

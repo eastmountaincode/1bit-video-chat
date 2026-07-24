@@ -26,14 +26,56 @@ test("continues the current line's leading spaces", () => {
   } satisfies TextIndentationEdit);
 });
 
-test("preserves mixed tabs and spaces without guessing CSS structure", () => {
+test("adds one indentation level after an opening brace", () => {
+  const value = "selector {";
+  const edit = insertLineBreakWithIndentation(
+    value,
+    caretAt(value.length),
+  );
+
+  assert.deepEqual(edit, {
+    value: `${value}\n  `,
+    selection: caretAt(value.length + 3),
+    splices: [
+      {
+        index: value.length,
+        deleteCount: 0,
+        insert: "\n  ",
+      },
+    ],
+  } satisfies TextIndentationEdit);
+});
+
+test("adds one indentation level after a nested opening brace", () => {
   const value = "\t  selector {";
   const edit = insertLineBreakWithIndentation(
     value,
     caretAt(value.length),
   );
 
-  assert.equal(edit.value, `${value}\n\t  `);
+  assert.equal(edit.value, `${value}\n\t    `);
+  assert.deepEqual(edit.selection, caretAt(edit.value.length));
+});
+
+test("preserves mixed tabs and spaces on ordinary lines", () => {
+  const value = "\t  selector {";
+  const edit = insertLineBreakWithIndentation(
+    `${value}\n\t  color: red;`,
+    caretAt(`${value}\n\t  color: red;`.length),
+  );
+
+  assert.equal(edit.value, `${value}\n\t  color: red;\n\t  `);
+  assert.deepEqual(edit.selection, caretAt(edit.value.length));
+});
+
+test("recognizes an opening brace before trailing spaces", () => {
+  const value = "selector {  ";
+  const edit = insertLineBreakWithIndentation(
+    value,
+    caretAt(value.length),
+  );
+
+  assert.equal(edit.value, `${value}\n  `);
   assert.deepEqual(edit.selection, caretAt(edit.value.length));
 });
 

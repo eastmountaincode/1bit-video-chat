@@ -14,22 +14,30 @@ import {
 } from "react";
 
 import {
-  applyTextSplice,
   computeTextSplice,
-  mapSelectionThroughTextChanges,
-  rebaseTextSpliceOntoText,
   type TextSelection,
   type TextSplice,
 } from "@/lib/collaborative-text";
 import {
   DEFAULT_COLLABORATIVE_ROOM_STYLE,
   DEFAULT_ROOM_STYLE,
+  createRoomStyleDocument,
   ensureRoomStyleScaffold,
+  getCollaborativeRoomStyleCss,
   MAX_ROOM_CSS_LENGTH,
+  readLegacyRoomStyleCss,
   ROOM_STYLE_SCAFFOLD,
+  syncLegacyRoomStyleCharacters,
   type CollaborativeRoomStyleData,
   type RoomStyleData,
 } from "@/lib/room-style";
+import {
+  mapSelectionByIdentity,
+  mergeTextEntrySplices,
+  readTextEntries,
+  readTextEntriesSafely,
+  type SharedTextMerge,
+} from "@/lib/shared-text-entries";
 import {
   changeTextIndentation,
   insertLineBreakWithIndentation,
@@ -55,7 +63,6 @@ function clampSelection(
 ): TextSelection {
   const start = Math.min(selection.start, textLength);
   const end = Math.max(start, Math.min(selection.end, textLength));
-
   return { ...selection, start, end };
 }
 
@@ -70,18 +77,94 @@ export function StylePanel({ active, name }: StylePanelProps) {
       "room-style:v2",
       DEFAULT_COLLABORATIVE_ROOM_STYLE,
     );
-  const { isLoading } = usePlayContext();
-  const sharedChars = Array.isArray(sharedDocument.chars)
-    ? sharedDocument.chars
-    : null;
-  const hasSharedDocument = sharedChars !== null;
+  const { cursors, isLoading } = usePlayContext();
+  const [reconciliationFraction] = useState(Math.random);
+  const participantCount = Math.max(1, cursors.allColors.length);
+  // Let one client repair first instead of making every participant publish
+  // the same full document epoch at once.
+  const reconciliationDelayMs =
+    25 +
+    Math.floor(
+      reconciliationFraction *
+        Math.min(2_500, 100 + participantCount * 120),
+    );
   const legacyCss = ensureRoomStyleScaffold(
     typeof legacyStyle.css === "string" ? legacyStyle.css : ROOM_STYLE_SCAFFOLD,
   );
-  const sharedCss = sharedChars ? sharedChars.join("") : legacyCss;
+  const sharedEntries = Array.isArray(sharedDocument.current?.entries)
+    ? sharedDocument.current.entries
+    : null;
+  const legacyCharacters = Array.isArray(sharedDocument.chars)
+    ? sharedDocument.chars
+    : null;
+  const legacyMirrorCss =
+    legacyCharacters === null
+      ? null
+      : readLegacyRoomStyleCss(
+          legacyCharacters,
+          MAX_ROOM_CSS_LENGTH,
+        );
+  const decodedSharedCss =
+    sharedEntries === null
+      ? null
+      : readTextEntriesSafely(
+          sharedEntries,
+          MAX_ROOM_CSS_LENGTH,
+        );
+  const sharedCss =
+    sharedEntries === null
+      ? getCollaborativeRoomStyleCss(sharedDocument, legacyCss)
+      : (decodedSharedCss ?? legacyCss);
+  const hasCurrentDocument = sharedEntries !== null;
+  const rawCurrentDocumentId = sharedDocument.current?.id;
+  const currentDocumentId =
+    typeof rawCurrentDocumentId === "string" &&
+    rawCurrentDocumentId.length > 0
+      ? rawCurrentDocumentId
+      : null;
+  const currentDocumentIsMalformed =
+    hasCurrentDocument &&
+    (decodedSharedCss === null || currentDocumentId === null);
+  const currentDocumentExceedsLimit =
+    (sharedEntries?.length ?? 0) > MAX_ROOM_CSS_LENGTH;
+  const legacyMirrorIsMalformed =
+    legacyCharacters !== null && legacyMirrorCss === null;
+  const legacyMirrorExceedsLimit =
+    (legacyCharacters?.length ?? 0) > MAX_ROOM_CSS_LENGTH;
+  const legacyMirrorIsOutOfSync =
+    hasCurrentDocument &&
+    decodedSharedCss !== null &&
+    legacyMirrorCss !== decodedSharedCss;
+  const compatibilityBridgeIsReady =
+    sharedDocument.version === 3 &&
+    legacyCharacters !== null &&
+    !legacyMirrorIsMalformed &&
+    !legacyMirrorExceedsLimit &&
+    !legacyMirrorIsOutOfSync;
+  const currentDocumentIsEditable =
+    hasCurrentDocument &&
+    !currentDocumentIsMalformed &&
+    !currentDocumentExceedsLimit &&
+    compatibilityBridgeIsReady;
+  const reconciliationNeeded =
+    hasCurrentDocument &&
+    (sharedDocument.version !== 3 ||
+      currentDocumentIsMalformed ||
+      currentDocumentExceedsLimit ||
+      legacyCharacters === null ||
+      legacyMirrorIsMalformed ||
+      legacyMirrorExceedsLimit ||
+      legacyMirrorIsOutOfSync);
+  const editorSharedEntries = currentDocumentIsEditable
+    ? sharedEntries
+    : null;
   const [editorValue, setEditorValue] = useState(ROOM_STYLE_SCAFFOLD);
+  const [selectionRevision, setSelectionRevision] = useState(0);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const editorValueRef = useRef(ROOM_STYLE_SCAFFOLD);
+  const editorEntriesRef = useRef<string[]>([]);
+  const documentIdRef = useRef<string | null>(null);
+  const entryCounterRef = useRef(0);
   const selectionRef = useRef<TextSelection>({
     start: 0,
     end: 0,
@@ -91,90 +174,181 @@ export function StylePanel({ active, name }: StylePanelProps) {
   const isComposingRef = useRef(false);
   const compositionBaseRef = useRef(ROOM_STYLE_SCAFFOLD);
   const compositionFinalValueRef = useRef<string | null>(null);
-  const compositionResultRef = useRef<string | null>(null);
   const allowNextTabToLeaveRef = useRef(false);
 
-  useEffect(() => {
-    if (isLoading || hasSharedDocument) return;
+  function updateEditor(
+    value: string,
+    entries: string[],
+    selection: TextSelection,
+  ) {
+    const valueChanged = editorValueRef.current !== value;
+    const nextSelection = clampSelection(selection, value.length);
+    editorValueRef.current = value;
+    editorEntriesRef.current = entries;
+    selectionRef.current = nextSelection;
+    pendingSelectionRef.current = nextSelection;
+    setEditorValue(value);
+    if (!valueChanged) {
+      setSelectionRevision((revision) => revision + 1);
+    }
+  }
 
-    const legacyChannel = playhtml.createPageData<RoomStyleData>(
-      "room-style:v1",
-      DEFAULT_ROOM_STYLE,
-    );
-    const liveLegacyStyle = legacyChannel.getData();
-    legacyChannel.destroy();
-    const source = {
-      css: ensureRoomStyleScaffold(
-        typeof liveLegacyStyle.css === "string"
-          ? liveLegacyStyle.css
-          : ROOM_STYLE_SCAFFOLD,
-      ),
-      updatedAt: liveLegacyStyle.updatedAt,
-      updatedBy: liveLegacyStyle.updatedBy,
-    };
-
-    setSharedDocument((draft) => {
-      if (Array.isArray(draft.chars)) return;
-
-      draft.chars = source.css.split("");
-      draft.updatedAt = source.updatedAt;
-      draft.updatedBy = source.updatedBy;
-      draft.version = 3;
-    });
-  }, [hasSharedDocument, isLoading, setSharedDocument]);
+  function createEntryPrefix() {
+    entryCounterRef.current += 1;
+    return `i${crypto.randomUUID().replaceAll("-", "").slice(0, 12)}-${entryCounterRef.current.toString(36)}`;
+  }
 
   useEffect(() => {
-    if (isLoading || !hasSharedDocument) return;
+    if (isLoading || hasCurrentDocument) return;
 
-    const scaffoldedCss = ensureRoomStyleScaffold(sharedCss);
-    if (sharedDocument.version === 3 && scaffoldedCss === sharedCss) return;
+    const timeoutId = window.setTimeout(() => {
+      const legacyChannel = playhtml.createPageData<RoomStyleData>(
+        "room-style:v1",
+        DEFAULT_ROOM_STYLE,
+      );
+      const liveLegacyStyle = legacyChannel.getData();
+      legacyChannel.destroy();
 
-    setSharedDocument((draft) => {
-      if (!Array.isArray(draft.chars)) return;
+      setSharedDocument((draft) => {
+        if (Array.isArray(draft.current?.entries)) return;
 
-      const liveCss = draft.chars.join("");
-      const nextCss = ensureRoomStyleScaffold(liveCss);
-      const scaffoldSplice = computeTextSplice(liveCss, nextCss);
-
-      if (scaffoldSplice) {
-        draft.chars.splice(
-          scaffoldSplice.index,
-          scaffoldSplice.deleteCount,
-          ...scaffoldSplice.insert.split(""),
+        const legacyDraftCss = Array.isArray(draft.chars)
+          ? readLegacyRoomStyleCss(
+              draft.chars,
+              MAX_ROOM_CSS_LENGTH,
+            )
+          : null;
+        const sourceCss = ensureRoomStyleScaffold(
+          legacyDraftCss !== null
+            ? legacyDraftCss
+            : typeof liveLegacyStyle.css === "string"
+              ? liveLegacyStyle.css
+              : ROOM_STYLE_SCAFFOLD,
         );
-      }
-      draft.version = 3;
-    });
+        draft.current = createRoomStyleDocument(
+          sourceCss,
+          crypto.randomUUID(),
+          Date.now(),
+        );
+        syncLegacyRoomStyleCharacters(draft, sourceCss);
+        draft.updatedAt = Date.now();
+        draft.updatedBy = name;
+        draft.version = 3;
+      });
+    }, reconciliationDelayMs);
+
+    return () => window.clearTimeout(timeoutId);
   }, [
-    hasSharedDocument,
+    hasCurrentDocument,
     isLoading,
+    name,
+    reconciliationDelayMs,
     setSharedDocument,
-    sharedCss,
-    sharedDocument.version,
+  ]);
+
+  useEffect(() => {
+    if (isLoading || !reconciliationNeeded) return;
+
+    const timeoutId = window.setTimeout(() => {
+      setSharedDocument((draft) => {
+        const liveEntries = draft.current?.entries;
+        if (!Array.isArray(liveEntries)) return;
+
+        const liveCss = readTextEntriesSafely(
+          liveEntries,
+          MAX_ROOM_CSS_LENGTH,
+        );
+        const liveDocumentId = draft.current?.id;
+        const liveNeedsNewEpoch =
+          liveCss === null ||
+          liveEntries.length > MAX_ROOM_CSS_LENGTH ||
+          typeof liveDocumentId !== "string" ||
+          liveDocumentId.length === 0;
+        const liveLegacyCharacters = Array.isArray(draft.chars)
+          ? draft.chars
+          : null;
+        const liveLegacyCss =
+          liveLegacyCharacters === null
+            ? null
+            : readLegacyRoomStyleCss(
+                liveLegacyCharacters,
+                MAX_ROOM_CSS_LENGTH,
+              );
+        let nextCss =
+          liveCss ?? liveLegacyCss ?? ROOM_STYLE_SCAFFOLD;
+        let currentChanged = false;
+
+        if (liveNeedsNewEpoch) {
+          draft.current = createRoomStyleDocument(
+            nextCss,
+            crypto.randomUUID(),
+            Date.now(),
+          );
+          currentChanged = true;
+        } else if (
+          liveLegacyCss !== null &&
+          (liveLegacyCss !== liveCss ||
+            (liveLegacyCharacters?.length ?? 0) >
+              MAX_ROOM_CSS_LENGTH)
+        ) {
+          nextCss = liveLegacyCss;
+          draft.current = createRoomStyleDocument(
+            nextCss,
+            crypto.randomUUID(),
+            Date.now(),
+          );
+          currentChanged = true;
+        }
+
+        const mirrorChanged = syncLegacyRoomStyleCharacters(
+          draft,
+          nextCss,
+        );
+        const versionChanged = draft.version !== 3;
+        if (currentChanged || mirrorChanged || versionChanged) {
+          draft.updatedAt = Date.now();
+          draft.updatedBy = name;
+          draft.version = 3;
+        }
+      });
+    }, reconciliationDelayMs);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [
+    isLoading,
+    name,
+    reconciliationDelayMs,
+    reconciliationNeeded,
+    setSharedDocument,
   ]);
 
   useLayoutEffect(() => {
-    if (!hasSharedDocument || isComposingRef.current) return;
+    if (!editorSharedEntries || isComposingRef.current) return;
 
-    const previousValue = editorValueRef.current;
-    if (previousValue === sharedCss) return;
-
+    const previousEntries = editorEntriesRef.current;
+    const nextDocumentId = currentDocumentId;
     const textarea = textareaRef.current;
     const currentSelection =
       textarea && document.activeElement === textarea
         ? readSelection(textarea)
         : selectionRef.current;
-    const nextSelection = mapSelectionThroughTextChanges(
-      previousValue,
-      sharedCss,
-      currentSelection,
-    );
+    const nextSelection =
+      documentIdRef.current === nextDocumentId &&
+      previousEntries.length > 0
+        ? mapSelectionByIdentity(
+            previousEntries,
+            editorSharedEntries,
+            currentSelection,
+          )
+        : clampSelection(currentSelection, editorSharedEntries.length);
 
-    editorValueRef.current = sharedCss;
-    selectionRef.current = clampSelection(nextSelection, sharedCss.length);
-    pendingSelectionRef.current = selectionRef.current;
-    setEditorValue(sharedCss);
-  }, [hasSharedDocument, sharedCss]);
+    documentIdRef.current = nextDocumentId;
+    updateEditor(
+      sharedCss,
+      [...editorSharedEntries],
+      nextSelection,
+    );
+  }, [currentDocumentId, editorSharedEntries, sharedCss]);
 
   useLayoutEffect(() => {
     const pendingSelection = pendingSelectionRef.current;
@@ -194,91 +368,135 @@ export function StylePanel({ active, name }: StylePanelProps) {
       pendingSelection.end,
       pendingSelection.direction,
     );
-  }, [editorValue]);
+  }, [editorValue, selectionRevision]);
 
-  function updateEditor(value: string, selection: TextSelection) {
-    const nextSelection = clampSelection(selection, value.length);
-    editorValueRef.current = value;
-    selectionRef.current = nextSelection;
-    pendingSelectionRef.current = nextSelection;
-    setEditorValue(value);
-  }
-
-  function commitSplices(before: string, localSplices: TextSplice[]) {
-    if (isLoading || !hasSharedDocument) return before;
-
-    let mergedText = before;
+  function commitSplices(
+    before: string,
+    localSplices: TextSplice[],
+    selection: TextSelection,
+  ) {
+    let result: SharedTextMerge = {
+      accepted: false,
+      entries: editorEntriesRef.current,
+      operations: [],
+      selection: clampSelection(selection, before.length),
+      text: before,
+    };
+    if (isLoading || !currentDocumentIsEditable) return result;
 
     setSharedDocument((draft) => {
-      if (!Array.isArray(draft.chars)) return;
+      const liveDocument = draft.current;
+      if (
+        !liveDocument ||
+        !Array.isArray(liveDocument.entries)
+      ) {
+        return;
+      }
+      const liveCss = readTextEntriesSafely(
+        liveDocument.entries,
+        MAX_ROOM_CSS_LENGTH,
+      );
+      if (
+        liveCss === null ||
+        liveDocument.entries.length > MAX_ROOM_CSS_LENGTH
+      ) {
+        return;
+      }
+      const liveDocumentId =
+        typeof liveDocument.id === "string" &&
+        liveDocument.id.length > 0
+          ? liveDocument.id
+          : null;
+      const liveLegacyCharacters = Array.isArray(draft.chars)
+        ? draft.chars
+        : null;
+      const liveLegacyCss =
+        liveLegacyCharacters === null
+          ? null
+          : readLegacyRoomStyleCss(
+              liveLegacyCharacters,
+              MAX_ROOM_CSS_LENGTH,
+            );
+      const liveBridgeIsReady =
+        draft.version === 3 &&
+        liveDocumentId !== null &&
+        liveLegacyCharacters !== null &&
+        liveLegacyCharacters.length <= MAX_ROOM_CSS_LENGTH &&
+        liveLegacyCss === liveCss;
 
-      let intendedText = before;
-      let nextText = draft.chars.join("");
-      let didChange = false;
-
-      for (const localSplice of localSplices) {
-        const rebasedSplices =
-          intendedText === nextText
-            ? [localSplice]
-            : rebaseTextSpliceOntoText(
-                intendedText,
-                nextText,
-                localSplice,
-                { insertAffinity: "after" },
-              );
-
-        for (const rebasedSplice of rebasedSplices) {
-          const index = Math.min(rebasedSplice.index, nextText.length);
-          const deleteCount = Math.min(
-            rebasedSplice.deleteCount,
-            nextText.length - index,
-          );
-          const availableInsertLength = Math.max(
-            0,
-            MAX_ROOM_CSS_LENGTH - (nextText.length - deleteCount),
-          );
-          const insert = rebasedSplice.insert.slice(0, availableInsertLength);
-
-          if (deleteCount === 0 && insert.length === 0) continue;
-
-          const appliedSplice = { index, deleteCount, insert };
-          draft.chars.splice(index, deleteCount, ...insert.split(""));
-          nextText = applyTextSplice(nextText, appliedSplice);
-          didChange = true;
-        }
-
-        intendedText = applyTextSplice(intendedText, localSplice);
+      if (
+        !liveBridgeIsReady ||
+        liveDocumentId !== documentIdRef.current
+      ) {
+        const documentEpochMatches =
+          liveDocumentId === documentIdRef.current;
+        documentIdRef.current = liveDocumentId;
+        result = {
+          accepted: false,
+          entries: [...liveDocument.entries],
+          operations: [],
+          selection: documentEpochMatches
+            ? mapSelectionByIdentity(
+                editorEntriesRef.current,
+                liveDocument.entries,
+                selection,
+              )
+            : clampSelection(selection, liveCss.length),
+          text: liveCss,
+        };
+        return;
       }
 
-      if (didChange) {
+      result = mergeTextEntrySplices(
+        editorEntriesRef.current,
+        liveDocument.entries,
+        localSplices,
+        selection,
+        createEntryPrefix,
+        MAX_ROOM_CSS_LENGTH,
+      );
+
+      for (const operation of result.operations) {
+        liveDocument.entries.splice(
+          operation.index,
+          operation.deleteCount,
+          ...operation.insert,
+        );
+        liveLegacyCharacters.splice(
+          operation.index,
+          operation.deleteCount,
+          ...readTextEntries(operation.insert).split(""),
+        );
+      }
+
+      if (result.operations.length > 0) {
         draft.updatedAt = Date.now();
         draft.updatedBy = name;
         draft.version = 3;
       }
-      mergedText = nextText;
     });
 
-    return mergedText;
+    return result;
   }
 
-  function commitEdit(before: string, after: string) {
+  function commitEdit(
+    before: string,
+    after: string,
+    selection: TextSelection,
+  ) {
     const localSplice = computeTextSplice(before, after);
-    return commitSplices(before, localSplice ? [localSplice] : []);
+    if (!localSplice) {
+      return commitSplices(before, [], selection);
+    }
+    return commitSplices(before, [localSplice], selection);
   }
 
   function applyKeyboardEdit(before: string, edit: TextIndentationEdit) {
     if (edit.value.length > MAX_ROOM_CSS_LENGTH) return;
 
     compositionFinalValueRef.current = null;
-    compositionResultRef.current = null;
-    const mergedText = commitSplices(before, edit.splices);
-    const mergedSelection = mapSelectionThroughTextChanges(
-      edit.value,
-      mergedText,
-      edit.selection,
-    );
-
-    updateEditor(mergedText, mergedSelection);
+    const result = commitSplices(before, edit.splices, edit.selection);
+    updateEditor(result.text, result.entries, result.selection);
   }
 
   function handleEditorChange(event: ChangeEvent<HTMLTextAreaElement>) {
@@ -289,30 +507,30 @@ export function StylePanel({ active, name }: StylePanelProps) {
       !isComposingRef.current &&
       compositionFinalValueRef.current === nextValue
     ) {
-      const compositionResult =
-        compositionResultRef.current ?? editorValueRef.current;
       compositionFinalValueRef.current = null;
-      compositionResultRef.current = null;
-      updateEditor(compositionResult, selectionRef.current);
+      updateEditor(
+        editorValueRef.current,
+        editorEntriesRef.current,
+        selectionRef.current,
+      );
       return;
     }
 
     compositionFinalValueRef.current = null;
-    compositionResultRef.current = null;
 
     if (isComposingRef.current) {
-      updateEditor(nextValue, nextSelection);
+      editorValueRef.current = nextValue;
+      selectionRef.current = nextSelection;
+      setEditorValue(nextValue);
       return;
     }
 
-    const mergedText = commitEdit(editorValueRef.current, nextValue);
-    const mergedSelection = mapSelectionThroughTextChanges(
+    const result = commitEdit(
+      editorValueRef.current,
       nextValue,
-      mergedText,
       nextSelection,
     );
-
-    updateEditor(mergedText, mergedSelection);
+    updateEditor(result.text, result.entries, result.selection);
   }
 
   function handleEditorKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
@@ -323,7 +541,6 @@ export function StylePanel({ active, name }: StylePanelProps) {
 
     if (event.key === "Enter") {
       allowNextTabToLeaveRef.current = false;
-
       if (
         event.altKey ||
         event.ctrlKey ||
@@ -335,15 +552,15 @@ export function StylePanel({ active, name }: StylePanelProps) {
       }
 
       const before = editorValueRef.current;
-      const indentationEdit = insertLineBreakWithIndentation(
+      const edit = insertLineBreakWithIndentation(
         before,
         readSelection(event.currentTarget),
         MAX_ROOM_CSS_LENGTH,
       );
-      if (indentationEdit.value.length > MAX_ROOM_CSS_LENGTH) return;
+      if (edit.value.length > MAX_ROOM_CSS_LENGTH) return;
 
       event.preventDefault();
-      applyKeyboardEdit(before, indentationEdit);
+      applyKeyboardEdit(before, edit);
       return;
     }
 
@@ -371,7 +588,6 @@ export function StylePanel({ active, name }: StylePanelProps) {
     }
 
     event.preventDefault();
-
     const before = editorValueRef.current;
     applyKeyboardEdit(
       before,
@@ -387,7 +603,6 @@ export function StylePanel({ active, name }: StylePanelProps) {
     isComposingRef.current = true;
     compositionBaseRef.current = editorValueRef.current;
     compositionFinalValueRef.current = null;
-    compositionResultRef.current = null;
   }
 
   function handleEditorBlur() {
@@ -399,16 +614,13 @@ export function StylePanel({ active, name }: StylePanelProps) {
     const composedSelection = readSelection(event.currentTarget);
     isComposingRef.current = false;
 
-    const mergedText = commitEdit(compositionBaseRef.current, composedValue);
-    const mergedSelection = mapSelectionThroughTextChanges(
+    const result = commitEdit(
+      compositionBaseRef.current,
       composedValue,
-      mergedText,
       composedSelection,
     );
-
     compositionFinalValueRef.current = composedValue;
-    compositionResultRef.current = mergedText;
-    updateEditor(mergedText, mergedSelection);
+    updateEditor(result.text, result.entries, result.selection);
   }
 
   function rememberSelection(event: SyntheticEvent<HTMLTextAreaElement>) {
@@ -416,31 +628,22 @@ export function StylePanel({ active, name }: StylePanelProps) {
   }
 
   function resetRoomStyle() {
-    if (isLoading || !hasSharedDocument) return;
+    if (isLoading || !hasCurrentDocument) return;
 
     setSharedDocument((draft) => {
-      if (!Array.isArray(draft.chars)) return;
+      if (!Array.isArray(draft.current?.entries)) return;
 
-      draft.chars.splice(
-        0,
-        draft.chars.length,
-        ...ROOM_STYLE_SCAFFOLD.split(""),
+      draft.current = createRoomStyleDocument(
+        ROOM_STYLE_SCAFFOLD,
+        crypto.randomUUID(),
+        Date.now(),
       );
+      syncLegacyRoomStyleCharacters(draft, ROOM_STYLE_SCAFFOLD);
       draft.updatedAt = Date.now();
       draft.updatedBy = name;
       draft.version = 3;
     });
-
-    updateEditor(ROOM_STYLE_SCAFFOLD, {
-      start: 0,
-      end: 0,
-      direction: "none",
-    });
   }
-
-  const lastChangedBy = hasSharedDocument
-    ? sharedDocument.updatedBy
-    : legacyStyle.updatedBy;
 
   return (
     <>
@@ -454,8 +657,11 @@ export function StylePanel({ active, name }: StylePanelProps) {
         <textarea
           aria-describedby={editorInstructionsId}
           aria-label="room css"
+          autoCapitalize="off"
+          autoComplete="off"
+          autoCorrect="off"
           className="style-editor"
-          disabled={isLoading || !hasSharedDocument}
+          disabled={isLoading || !currentDocumentIsEditable}
           maxLength={MAX_ROOM_CSS_LENGTH}
           onBlur={handleEditorBlur}
           onChange={handleEditorChange}
@@ -468,8 +674,9 @@ export function StylePanel({ active, name }: StylePanelProps) {
           value={editorValue}
         />
         <span className="visually-hidden" id={editorInstructionsId}>
-          Enter keeps the current indentation. Tab indents; Shift+Tab
-          outdents. Press Escape, then Tab to leave the editor.
+          Enter keeps the current indentation and adds one level after an
+          opening brace. Tab indents; Shift+Tab outdents. Press Escape, then
+          Tab to leave the editor.
         </span>
         <div className="style-panel-footer">
           <output>
@@ -477,14 +684,13 @@ export function StylePanel({ active, name }: StylePanelProps) {
             {MAX_ROOM_CSS_LENGTH.toLocaleString()}
           </output>
           <button
-            disabled={isLoading || !hasSharedDocument}
+            disabled={isLoading || !hasCurrentDocument}
             onClick={resetRoomStyle}
             type="button"
           >
             reset room style
           </button>
         </div>
-        {lastChangedBy ? <small>last changed by {lastChangedBy}</small> : null}
       </fieldset>
     </>
   );
