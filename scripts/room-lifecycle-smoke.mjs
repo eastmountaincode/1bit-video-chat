@@ -37,12 +37,7 @@ const createdBody = await createResponse.json();
 assert.equal(typeof createdBody?.room?.id, "string");
 const roomId = createdBody.room.id;
 
-const roomsAfterCreate = await getRooms();
-assert.equal(
-  roomsAfterCreate.some((room) => room?.id === roomId),
-  true,
-  "The created room is missing from the directory.",
-);
+await waitForRoomListing(roomId, true);
 
 const heartbeatResponses = await Promise.all(
   Array.from({ length: 20 }, () =>
@@ -68,12 +63,7 @@ if (waitForExpiry) {
   const expiryWaitMs = 145_000;
   await new Promise((resolve) => setTimeout(resolve, expiryWaitMs));
 
-  const roomsAfterExpiry = await getRooms();
-  assert.equal(
-    roomsAfterExpiry.some((room) => room?.id === roomId),
-    false,
-    "The room is still listed after its heartbeat deadline.",
-  );
+  await waitForRoomListing(roomId, false);
 
   const expiredHeartbeat = await request(
     `/api/rooms/${encodeURIComponent(roomId)}/heartbeat`,
@@ -106,6 +96,26 @@ async function getRooms() {
   const body = await response.json();
   assert.equal(Array.isArray(body?.rooms), true, "Room list is not an array.");
   return body.rooms;
+}
+
+async function waitForRoomListing(roomId, shouldBePresent) {
+  const timeoutAt = Date.now() + 12_000;
+
+  while (Date.now() < timeoutAt) {
+    const rooms = await getRooms();
+    if (
+      rooms.some((room) => room?.id === roomId) === shouldBePresent
+    ) {
+      return;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 500));
+  }
+
+  assert.fail(
+    shouldBePresent
+      ? "The created room is missing from the directory."
+      : "The expired room is still in the directory.",
+  );
 }
 
 async function request(pathname, init) {
