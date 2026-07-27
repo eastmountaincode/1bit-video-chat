@@ -550,10 +550,9 @@ legend {
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem;
-  justify-content: space-between;
+  justify-content: flex-end;
 }
 
-.style-panel-footer output,
 .style-panel small {
   color: var(--muted);
   font-size: 0.8rem;

@@ -702,10 +702,6 @@ export function StylePanel({ active, name }: StylePanelProps) {
           Tab to leave the editor.
         </span>
         <div className="style-panel-footer">
-          <output>
-            {editorValue.length.toLocaleString()} /{" "}
-            {MAX_ROOM_CSS_LENGTH.toLocaleString()}
-          </output>
           <button
             disabled={isLoading || !hasCurrentDocument}
             onClick={resetRoomStyle}
