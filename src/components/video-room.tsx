@@ -44,7 +44,7 @@ export function VideoRoom({ name, onLeave, roomName, stream }: VideoRoomProps) {
   } = useVideoPresence({ enabled: !isLoading, name });
   const videoConnectionStatus =
     connectionState === "reconnecting"
-      ? "Video connection: reconnecting... Sending and receiving video is paused."
+      ? "video reconnecting..."
       : videoConnectionError;
   const frame = useGrayscaleCamera(stream, captureSettings);
   const payloadSamplesRef = useRef<VideoPayloadSample[]>([]);
