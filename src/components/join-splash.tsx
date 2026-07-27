@@ -13,17 +13,10 @@ interface JoinSplashProps {
   participantCount: number;
   permission: CameraPermission;
   requestCamera: () => Promise<MediaStream | null>;
+  roomName: string;
   stream: MediaStream | null;
   onJoin: (name: string) => Promise<void>;
 }
-
-const permissionLabels: Record<CameraPermission, string> = {
-  checking: "checking",
-  denied: "blocked",
-  granted: "allowed",
-  prompt: "not allowed yet",
-  unavailable: "unavailable",
-};
 
 export function JoinSplash({
   capacity,
@@ -33,6 +26,7 @@ export function JoinSplash({
   participantCount,
   permission,
   requestCamera,
+  roomName,
   stream,
 }: JoinSplashProps) {
   const [name, setName] = useState("");
@@ -62,8 +56,11 @@ export function JoinSplash({
             </a>
           </p>
 
-          <p className="camera-status">
-            Camera: {permissionLabels[permission]}
+          <p className="lobby-room-summary">
+            room: <strong>{roomName}</strong>{" "}
+            <span className="room-participant-count">
+              ({participantCount}/{capacity})
+            </span>
           </p>
 
           <figure className="preview-frame">
@@ -90,9 +87,6 @@ export function JoinSplash({
                 allow camera
               </button>
             ) : null}
-            <span className="room-participant-count">
-              ({participantCount}/{capacity})
-            </span>
             <button disabled={!canJoin} type="submit">
               join room
             </button>

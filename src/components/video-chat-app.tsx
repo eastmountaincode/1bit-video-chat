@@ -148,6 +148,7 @@ export function VideoChatApp({
       participantCount={participantCount}
       permission={permission}
       requestCamera={requestCamera}
+      roomName={roomName}
       stream={stream}
     />
   );
