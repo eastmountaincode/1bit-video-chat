@@ -16,12 +16,11 @@ export interface CaptureRoomLoad {
   participantCount: number;
   pixelUpdatesPerSecond: number;
   roomMessageDeliveriesPerSecond: number;
+  totalFramePixels: number;
   transportMessagesPerSecond: number;
-  totalPixelNodes: number;
 }
 
 export interface AdaptiveCaptureOptions {
-  livePixelMetadata?: boolean;
   name?: string;
   serverMaxHz?: number;
 }
@@ -34,17 +33,14 @@ export const CAPTURE_SETTINGS_LIMITS = {
 } as const;
 
 /**
- * Room-level safety rails. Twenty 100 x 75 tiles exactly meet the node budget.
- * Live pixel metadata has a lower budget because it mutates every cell on every
- * frame; ordinary canvas frames do not pay that DOM cost.
+ * Room-level safety rails for decoding, drawing, receiving, and relaying
+ * low-resolution canvas frames.
  */
 export const CAPTURE_ROOM_BUDGETS = {
   estimatedInboundBytesPerSecond: 1_750_000,
-  livePixelUpdatesPerSecond: 40_000,
-  pixelOverlayNodes: 4_000,
   pixelUpdatesPerSecond: 2_500_000,
   roomMessageDeliveriesPerSecond: 3_800,
-  totalPixelNodes: 150_000,
+  totalFramePixels: 150_000,
 } as const;
 
 export const DEFAULT_CAPTURE_SETTINGS: CaptureSettings = {
@@ -79,9 +75,9 @@ export function estimateCaptureRoomLoad(
       remoteParticipantCount *
       transport.messages *
       normalized.frameRate,
+    totalFramePixels: safeParticipantCount * pixelsPerFrame,
     transportMessagesPerSecond:
       transport.messages * normalized.frameRate,
-    totalPixelNodes: safeParticipantCount * pixelsPerFrame,
   };
 }
 
@@ -97,14 +93,8 @@ export function getAdaptiveCaptureSettings(
   const safeParticipantCount = normalizeParticipantCount(participantCount);
   let settings = normalizeCaptureSettings(requested);
   const aspectRatio = settings.width / settings.height;
-  const totalPixelNodeBudget = options.livePixelMetadata
-    ? Math.min(
-        CAPTURE_ROOM_BUDGETS.totalPixelNodes,
-        CAPTURE_ROOM_BUDGETS.pixelOverlayNodes,
-      )
-    : CAPTURE_ROOM_BUDGETS.totalPixelNodes;
   const pixelBudget = Math.floor(
-    totalPixelNodeBudget / safeParticipantCount,
+    CAPTURE_ROOM_BUDGETS.totalFramePixels / safeParticipantCount,
   );
 
   if (settings.width * settings.height > pixelBudget) {
@@ -117,11 +107,9 @@ export function getAdaptiveCaptureSettings(
 
   const remoteParticipantCount = Math.max(0, safeParticipantCount - 1);
   const pixelsPerFrame = settings.width * settings.height;
-  const pixelUpdateBudget = options.livePixelMetadata
-    ? CAPTURE_ROOM_BUDGETS.livePixelUpdatesPerSecond
-    : CAPTURE_ROOM_BUDGETS.pixelUpdatesPerSecond;
   const updateRateLimit = Math.floor(
-    pixelUpdateBudget / (safeParticipantCount * pixelsPerFrame),
+    CAPTURE_ROOM_BUDGETS.pixelUpdatesPerSecond /
+      (safeParticipantCount * pixelsPerFrame),
   );
   const transport = estimatePresenceFrameTransport(settings, options.name);
   const serverMaxHz = normalizeServerMaxHz(options.serverMaxHz);
@@ -159,16 +147,6 @@ export function getAdaptiveCaptureSettings(
       CAPTURE_SETTINGS_LIMITS.frameRate.max,
     ),
   };
-}
-
-export function getPixelOverlayCellBudget(participantCount: number) {
-  return Math.max(
-    1,
-    Math.floor(
-      CAPTURE_ROOM_BUDGETS.pixelOverlayNodes /
-        normalizeParticipantCount(participantCount),
-    ),
-  );
 }
 
 export function normalizeCaptureSettings(

@@ -1,6 +1,6 @@
 "use client";
 
-import { usePageData, usePlayContext } from "@playhtml/react";
+import { usePlayContext } from "@playhtml/react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import {
@@ -13,19 +13,8 @@ import { useVideoPresence } from "@/hooks/use-video-presence";
 import {
   DEFAULT_CAPTURE_SETTINGS,
   getAdaptiveCaptureSettings,
-  getPixelOverlayCellBudget,
   type CaptureSettings,
 } from "@/lib/capture-settings";
-import {
-  DEFAULT_COLLABORATIVE_ROOM_STYLE,
-  DEFAULT_ROOM_STYLE,
-  getCollaborativeRoomStyleCss,
-  roomStyleUsesLivePixelMetadata,
-  roomStyleUsesVideoPixelOverlay,
-  ROOM_STYLE_SCAFFOLD,
-  type CollaborativeRoomStyleData,
-  type RoomStyleData,
-} from "@/lib/room-style";
 import type { VideoPayloadRate } from "@/lib/shared-types";
 import {
   measureVideoPayloadBytes,
@@ -59,40 +48,14 @@ export function VideoRoom({ name, onLeave, roomName, stream }: VideoRoomProps) {
     connectionState === "reconnecting"
       ? "Video connection: reconnecting... Sending and receiving video is paused."
       : videoConnectionError;
-  const [legacyStyle] = usePageData<RoomStyleData>(
-    "room-style:v1",
-    DEFAULT_ROOM_STYLE,
-  );
-  const [sharedStyle] = usePageData<CollaborativeRoomStyleData>(
-    "room-style:v2",
-    DEFAULT_COLLABORATIVE_ROOM_STYLE,
-  );
-  const sharedCss = getCollaborativeRoomStyleCss(
-    sharedStyle,
-    typeof legacyStyle.css === "string"
-      ? legacyStyle.css
-      : ROOM_STYLE_SCAFFOLD,
-  );
-  const livePixelMetadata = useMemo(
-    () => roomStyleUsesLivePixelMetadata(sharedCss),
-    [sharedCss],
-  );
-  const pixelOverlayEnabled = useMemo(
-    () => roomStyleUsesVideoPixelOverlay(sharedCss),
-    [sharedCss],
-  );
   const effectiveCaptureSettings = useMemo(
     () =>
       getAdaptiveCaptureSettings(captureSettings, participantCount, {
-        livePixelMetadata,
         name,
         serverMaxHz,
       }),
-    [captureSettings, livePixelMetadata, name, participantCount, serverMaxHz],
+    [captureSettings, name, participantCount, serverMaxHz],
   );
-  const maxPixelCells = pixelOverlayEnabled
-    ? getPixelOverlayCellBudget(participantCount)
-    : undefined;
   const frame = useGrayscaleCamera(stream, effectiveCaptureSettings);
   const payloadSamplesRef = useRef<VideoPayloadSample[]>([]);
   const lastPayloadRateUiUpdateRef = useRef(0);
@@ -202,21 +165,15 @@ export function VideoRoom({ name, onLeave, roomName, stream }: VideoRoomProps) {
             <VideoTile
               frame={frame}
               isMe
-              livePixelMetadata={livePixelMetadata}
-              maxPixelCells={maxPixelCells}
               name={name}
               payloadRate={localPayloadRate}
-              pixelOverlayEnabled={pixelOverlayEnabled}
             />
             {remoteParticipants.map((participant) => (
               <VideoTile
                 frame={participant.frame}
                 key={participant.id}
-                livePixelMetadata={livePixelMetadata}
-                maxPixelCells={maxPixelCells}
                 name={participant.name}
                 payloadRate={participant.payloadRate}
-                pixelOverlayEnabled={pixelOverlayEnabled}
               />
             ))}
           </div>

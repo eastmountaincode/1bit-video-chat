@@ -27,6 +27,7 @@ import {
   getCollaborativeRoomStyleCss,
   MAX_ROOM_CSS_LENGTH,
   readLegacyRoomStyleCss,
+  removeObsoleteRoomStyleTargets,
   ROOM_STYLE_SCAFFOLD,
   syncLegacyRoomStyleCharacters,
   type CollaborativeRoomStyleData,
@@ -112,10 +113,15 @@ export function StylePanel({ active, name }: StylePanelProps) {
           sharedEntries,
           MAX_ROOM_CSS_LENGTH,
         );
-  const sharedCss =
+  const migratedSharedCss =
+    decodedSharedCss === null
+      ? null
+      : removeObsoleteRoomStyleTargets(decodedSharedCss);
+  const rawSharedCss =
     sharedEntries === null
       ? getCollaborativeRoomStyleCss(sharedDocument, legacyCss)
-      : (decodedSharedCss ?? legacyCss);
+      : (migratedSharedCss ?? legacyCss);
+  const sharedCss = removeObsoleteRoomStyleTargets(rawSharedCss);
   const hasCurrentDocument = sharedEntries !== null;
   const rawCurrentDocumentId = sharedDocument.current?.id;
   const currentDocumentId =
@@ -128,6 +134,10 @@ export function StylePanel({ active, name }: StylePanelProps) {
     (decodedSharedCss === null || currentDocumentId === null);
   const currentDocumentExceedsLimit =
     (sharedEntries?.length ?? 0) > MAX_ROOM_CSS_LENGTH;
+  const currentDocumentNeedsMigration =
+    hasCurrentDocument &&
+    decodedSharedCss !== null &&
+    migratedSharedCss !== decodedSharedCss;
   const legacyMirrorIsMalformed =
     legacyCharacters !== null && legacyMirrorCss === null;
   const legacyMirrorExceedsLimit =
@@ -146,12 +156,14 @@ export function StylePanel({ active, name }: StylePanelProps) {
     hasCurrentDocument &&
     !currentDocumentIsMalformed &&
     !currentDocumentExceedsLimit &&
+    !currentDocumentNeedsMigration &&
     compatibilityBridgeIsReady;
   const reconciliationNeeded =
     hasCurrentDocument &&
     (sharedDocument.version !== 3 ||
       currentDocumentIsMalformed ||
       currentDocumentExceedsLimit ||
+      currentDocumentNeedsMigration ||
       legacyCharacters === null ||
       legacyMirrorIsMalformed ||
       legacyMirrorExceedsLimit ||
@@ -277,28 +289,31 @@ export function StylePanel({ active, name }: StylePanelProps) {
               );
         let nextCss =
           liveCss ?? liveLegacyCss ?? ROOM_STYLE_SCAFFOLD;
-        let currentChanged = false;
+        let currentChanged = liveNeedsNewEpoch;
 
-        if (liveNeedsNewEpoch) {
-          draft.current = createRoomStyleDocument(
-            nextCss,
-            crypto.randomUUID(),
-            Date.now(),
-          );
-          currentChanged = true;
-        } else if (
+        if (
+          !liveNeedsNewEpoch &&
           liveLegacyCss !== null &&
           (liveLegacyCss !== liveCss ||
             (liveLegacyCharacters?.length ?? 0) >
               MAX_ROOM_CSS_LENGTH)
         ) {
           nextCss = liveLegacyCss;
+          currentChanged = true;
+        }
+
+        const migratedCss = removeObsoleteRoomStyleTargets(nextCss);
+        if (migratedCss !== nextCss) {
+          nextCss = migratedCss;
+          currentChanged = true;
+        }
+
+        if (currentChanged) {
           draft.current = createRoomStyleDocument(
             nextCss,
             crypto.randomUUID(),
             Date.now(),
           );
-          currentChanged = true;
         }
 
         const mirrorChanged = syncLegacyRoomStyleCharacters(

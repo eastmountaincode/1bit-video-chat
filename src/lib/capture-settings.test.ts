@@ -6,7 +6,6 @@ import {
   DEFAULT_CAPTURE_SETTINGS,
   estimateCaptureRoomLoad,
   getAdaptiveCaptureSettings,
-  getPixelOverlayCellBudget,
   normalizeCaptureSettings,
 } from "./capture-settings.ts";
 
@@ -66,7 +65,7 @@ test("preserves lower user choices and adapts beyond twenty people", () => {
   assertRoomLoadWithinBudgets(thirtyPersonDefault, 30);
 });
 
-test("budgets chunked frames by messages and live pixel styles by DOM work", () => {
+test("budgets chunked frames by their transport message count", () => {
   const chunked = getAdaptiveCaptureSettings(
     {
       frameRate: 20,
@@ -79,24 +78,6 @@ test("budgets chunked frames by messages and live pixel styles by DOM work", () 
   assert.equal(chunked.frameRate, 3);
   assert.ok(
     estimateCaptureRoomLoad(chunked, 20).transportMessagesPerSecond <= 20,
-  );
-
-  const livePixels = getAdaptiveCaptureSettings(
-    DEFAULT_CAPTURE_SETTINGS,
-    20,
-    { livePixelMetadata: true },
-  );
-  assert.deepEqual(livePixels, {
-    frameRate: 10,
-    grayscaleBits: 3,
-    height: 12,
-    width: 16,
-  });
-  assertRoomLoadWithinBudgets(livePixels, 20, true);
-  assert.equal(getPixelOverlayCellBudget(20), 200);
-  assert.ok(
-    getPixelOverlayCellBudget(20) * 20 <=
-      CAPTURE_ROOM_BUDGETS.pixelOverlayNodes,
   );
 });
 
@@ -138,23 +119,15 @@ test("normalizes invalid and out-of-range capture settings", () => {
 function assertRoomLoadWithinBudgets(
   settings: Parameters<typeof estimateCaptureRoomLoad>[0],
   participantCount: number,
-  livePixelMetadata = false,
 ) {
   const load = estimateCaptureRoomLoad(settings, participantCount);
 
   assert.ok(
-    load.totalPixelNodes <= CAPTURE_ROOM_BUDGETS.totalPixelNodes,
+    load.totalFramePixels <= CAPTURE_ROOM_BUDGETS.totalFramePixels,
   );
-  if (livePixelMetadata) {
-    assert.ok(
-      load.totalPixelNodes <= CAPTURE_ROOM_BUDGETS.pixelOverlayNodes,
-    );
-  }
   assert.ok(
     load.pixelUpdatesPerSecond <=
-      (livePixelMetadata
-        ? CAPTURE_ROOM_BUDGETS.livePixelUpdatesPerSecond
-        : CAPTURE_ROOM_BUDGETS.pixelUpdatesPerSecond),
+      CAPTURE_ROOM_BUDGETS.pixelUpdatesPerSecond,
   );
   assert.ok(
     load.estimatedInboundBytesPerSecond <=

@@ -9,7 +9,6 @@ A silent low-resolution grayscale video chat built with Next.js and PlayHTML.
 - Capture settings are local to each participant and only change their outgoing video.
 - Room style is shared, persistent raw CSS with URL support, stable `data-room-part` targets, a 20,000-character limit, and a global reset.
 - Each viewer can target only their own card with `[data-room-part="video-card"][data-video-side="own"]`.
-- Individual pixels can be targeted through `[data-room-part="video-pixel"]`, with stable `--pixel-x`, `--pixel-y`, and `--pixel-index` values. The overlay mounts only when shared CSS uses pixel styling and is capped at 4,000 cells room-wide; styles that need changing pixel values or geometry also enter a guarded lower-resolution live-cell mode.
 - The server-backed lobby lists public rooms and lets anyone create one.
 - User-created rooms expire after their last room-page heartbeat, with a two-minute empty-room grace period; Main room remains permanent.
 - Every room has its own isolated video presence, chat, and shared style state.
@@ -39,12 +38,11 @@ npm run test:rooms:live
 Add `-- --wait-for-expiry` to also wait for the room to expire and verify that
 its list entry and URL stop working.
 
-In development, `/benchmark?participants=20&fps=15&style=border&duration=10`
+In development, `/benchmark?participants=20&fps=15&duration=10`
 runs the real tile renderer with mock participants and reports long tasks,
 animation timing, commit latency, update throughput, memory, and DOM size.
-Pixel styles are `default`, `color`, `background`, `border`, and `metadata`;
-the last exercises per-frame `--pixel-gray` updates. `width`, `height`, and
-`bits` query parameters can test the app's adaptive large-room settings.
+`width`, `height`, and `bits` query parameters can test the app's adaptive
+large-room settings.
 
 The transport benchmark uses a unique live PlayHTML room, changes every mock
 camera frame, and fails if delivery, duplication, or reconnect churn crosses

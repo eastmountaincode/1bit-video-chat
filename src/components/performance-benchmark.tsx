@@ -3,18 +3,9 @@
 import { useEffect, useRef, useState } from "react";
 
 import { VideoTile } from "@/components/video-tile";
-import {
-  getAdaptiveCaptureSettings,
-  getPixelOverlayCellBudget,
-} from "@/lib/capture-settings";
+import { getAdaptiveCaptureSettings } from "@/lib/capture-settings";
 import type { GrayscaleFrame } from "@/lib/shared-types";
 
-type BenchmarkPixelStyle =
-  | "background"
-  | "border"
-  | "color"
-  | "default"
-  | "metadata";
 type BenchmarkStatus =
   | "complete"
   | "error"
@@ -28,7 +19,6 @@ interface BenchmarkConfig {
   fps: number;
   height: number;
   participants: number;
-  style: BenchmarkPixelStyle;
   warmupMs: number;
   width: number;
 }
@@ -88,7 +78,7 @@ export interface TelepathyBenchmarkResult {
     missedScheduleBatches: number;
     scheduleDelayMs: TimingSummary;
   };
-  version: 1;
+  version: 2;
 }
 
 interface RenderState {
@@ -122,7 +112,6 @@ const DEFAULT_CONFIG: BenchmarkConfig = {
   fps: 15,
   height: 75,
   participants: 20,
-  style: "default",
   warmupMs: 2_000,
   width: 100,
 };
@@ -181,7 +170,6 @@ export function PerformanceBenchmark() {
         },
         requestedConfig.participants,
         {
-          livePixelMetadata: requestedConfig.style === "metadata",
           name: `mock ${requestedConfig.participants}`,
         },
       );
@@ -263,7 +251,7 @@ export function PerformanceBenchmark() {
           flushLongTasks?.();
           longTaskObserver?.disconnect();
 
-          // Let the final React commit and child pixel effects flush before the
+          // Let the final React commit and canvas effects flush before the
           // result counts unresolved updates and DOM nodes.
           animationFrame = window.requestAnimationFrame(() => {
             animationFrame = window.requestAnimationFrame(() => {
@@ -341,7 +329,7 @@ export function PerformanceBenchmark() {
 
       // State initialization runs from the browser scheduler rather than
       // synchronously inside the effect. Two more frames allow the initial
-      // 150,000-pixel default DOM to mount before the warm-up clock begins.
+      // canvas tiles to mount before the warm-up clock begins.
       animationFrame = window.requestAnimationFrame(() => {
         if (cancelled) return;
 
@@ -376,7 +364,6 @@ export function PerformanceBenchmark() {
     };
   }, []);
 
-  const pixelStyle = getPixelStyle(config.style);
   const statusLabel =
     status === "error" ? `error: ${errorMessage}` : status;
 
@@ -409,16 +396,14 @@ export function PerformanceBenchmark() {
           padding: 0.5rem;
           white-space: pre-wrap;
         }
-
-        ${pixelStyle}
       `}</style>
 
       <header className="benchmark-header">
         <h1>Telepathy rendering benchmark</h1>
         <p>
-          {config.participants} participants · {config.fps} fps · {config.style}
-          {" "}pixel style · {config.width}×{config.height}×{config.bits}-bit ·
-          {" "}{config.durationMs / 1_000}s measurement
+          {config.participants} participants · {config.fps} fps · canvas ·{" "}
+          {config.width}×{config.height}×{config.bits}-bit ·{" "}
+          {config.durationMs / 1_000}s measurement
         </p>
         <p data-benchmark-status={status}>status: {statusLabel}</p>
         <pre
@@ -441,14 +426,7 @@ export function PerformanceBenchmark() {
             >
               <VideoTile
                 frame={frame}
-                livePixelMetadata={config.style === "metadata"}
-                maxPixelCells={
-                  config.style !== "default"
-                    ? getPixelOverlayCellBudget(config.participants)
-                    : undefined
-                }
                 name={`mock ${participantIndex + 1}`}
-                pixelOverlayEnabled={config.style !== "default"}
                 renderWhenOffscreen
               />
             </div>
@@ -539,7 +517,7 @@ function buildResult(
       ),
       scheduleDelayMs: summarizeTimings(activeRun.scheduleDelays),
     },
-    version: 1,
+    version: 2,
   };
 }
 
@@ -590,52 +568,7 @@ function bytesToBase64(bytes: Uint8Array) {
   return window.btoa(binary);
 }
 
-function getPixelStyle(style: BenchmarkPixelStyle) {
-  if (style === "color") {
-    return `
-      [data-benchmark-root] [data-room-part="video-frame"] > [data-room-part="video-pixel"] {
-        color: red !important;
-      }
-    `;
-  }
-
-  if (style === "background") {
-    return `
-      [data-benchmark-root] [data-room-part="video-frame"] > [data-room-part="video-pixel"] {
-        background: red !important;
-      }
-    `;
-  }
-
-  if (style === "border") {
-    return `
-      [data-benchmark-root] [data-room-part="video-frame"] > [data-room-part="video-pixel"] {
-        border: 1px solid red !important;
-      }
-    `;
-  }
-
-  if (style === "metadata") {
-    return `
-      [data-benchmark-root] [data-room-part="video-frame"] > [data-room-part="video-pixel"] {
-        opacity: calc(var(--pixel-gray, 0) / 255);
-      }
-    `;
-  }
-
-  return "";
-}
-
 function readBenchmarkConfig(params: URLSearchParams): BenchmarkConfig {
-  const styleValue = params.get("style");
-  const style: BenchmarkPixelStyle =
-    styleValue === "background" ||
-    styleValue === "border" ||
-    styleValue === "color" ||
-    styleValue === "metadata"
-      ? styleValue
-      : "default";
-
   return {
     bits: readBoundedNumber(params, "bits", 3, 1, 5),
     durationMs:
@@ -643,7 +576,6 @@ function readBenchmarkConfig(params: URLSearchParams): BenchmarkConfig {
     fps: readBoundedNumber(params, "fps", 15, 1, 30),
     height: readBoundedNumber(params, "height", 75, 6, 162),
     participants: readBoundedNumber(params, "participants", 20, 1, 40),
-    style,
     warmupMs: readBoundedNumber(params, "warmup", 2, 0, 10) * 1_000,
     width: readBoundedNumber(params, "width", 100, 8, 216),
   };

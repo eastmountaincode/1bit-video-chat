@@ -163,7 +163,7 @@ function seedStyleDocument(document) {
     "  color: black;",
     "}",
     "",
-    '[data-room-part="video-pixel"] {',
+    '[data-room-part="video-frame"] {',
     "  background: white;",
     "}",
   ].join("\n");

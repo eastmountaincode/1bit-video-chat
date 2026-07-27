@@ -324,14 +324,9 @@ legend {
 .grayscale-canvas {
   --frame-columns: 4;
   --frame-rows: 3;
-  --pixel-columns: 4;
-  --pixel-rows: 3;
   aspect-ratio: var(--frame-columns) / var(--frame-rows);
   background: #ffffff;
   contain: layout paint style;
-  display: grid;
-  grid-template-columns: repeat(var(--pixel-columns), minmax(0, 1fr));
-  grid-template-rows: repeat(var(--pixel-rows), minmax(0, 1fr));
   isolation: isolate;
   overflow: hidden;
   position: relative;
@@ -339,34 +334,12 @@ legend {
 }
 
 .grayscale-canvas-backing {
+  display: block;
   height: 100%;
+  image-rendering: pixelated;
   inset: 0;
   position: absolute;
   width: 100%;
-}
-
-.grayscale-canvas-backing {
-  display: block;
-  image-rendering: pixelated;
-}
-
-.grayscale-canvas[data-pixel-source="cells"]
-  .grayscale-canvas-backing {
-  visibility: hidden;
-}
-
-.grayscale-pixel {
-  background-color: currentColor;
-  color: transparent;
-  min-height: 0;
-  min-width: 0;
-  pointer-events: none;
-}
-
-.grayscale-pixel-live {
-  color: rgb(
-    var(--pixel-gray, 255) var(--pixel-gray, 255) var(--pixel-gray, 255)
-  );
 }
 
 .video-tile figcaption {

@@ -14,7 +14,6 @@ export const ROOM_STYLE_TARGETS = [
   '[data-room-part="video-card"]',
   '[data-room-part="video-card"][data-video-side="own"]',
   '[data-room-part="video-frame"]',
-  '[data-room-part="video-pixel"]',
   '[data-room-part="video-caption"]',
   '[data-room-part="video-rate"]',
   '[data-room-part="leave"]',
@@ -30,6 +29,7 @@ export const ROOM_STYLE_TARGETS = [
 
 const OBSOLETE_ROOM_STYLE_TARGETS = [
   '[data-room-part="chat-controls"]',
+  '[data-room-part="video-pixel"]',
 ] as const;
 
 export const ROOM_STYLE_SCAFFOLD = ROOM_STYLE_TARGETS.map(
@@ -123,14 +123,7 @@ function hasSelectorBlock(css: string, selector: string) {
 }
 
 export function ensureRoomStyleScaffold(css: string) {
-  const normalizedCss = OBSOLETE_ROOM_STYLE_TARGETS.reduce(
-    (currentCss, selector) =>
-      currentCss.replace(
-        new RegExp(`${escapeRegExp(selector)}\\s*\\{[^{}]*\\}\\s*`, "g"),
-        "",
-      ),
-    css,
-  );
+  const normalizedCss = removeObsoleteRoomStyleTargets(css);
   const limitedCss = normalizedCss.slice(0, MAX_ROOM_CSS_LENGTH);
   const missingBlocks = ROOM_STYLE_TARGETS.filter(
     (selector) => !hasSelectorBlock(limitedCss, selector),
@@ -143,13 +136,39 @@ export function ensureRoomStyleScaffold(css: string) {
   return `${limitedCss.slice(0, availableLength).trimEnd()}${suffix}`;
 }
 
+export function removeObsoleteRoomStyleTargets(css: string) {
+  return OBSOLETE_ROOM_STYLE_TARGETS.reduce(
+    (currentCss, selector) =>
+      removeStandaloneSelectorBlocks(currentCss, selector),
+    css,
+  );
+}
+
+function removeStandaloneSelectorBlocks(css: string, selector: string) {
+  const pattern = new RegExp(
+    `(^|[{}])(\\s*)${escapeRegExp(selector)}\\s*\\{[^{}]*\\}`,
+    "g",
+  );
+  let currentCss = css;
+
+  while (true) {
+    const nextCss = currentCss.replace(
+      pattern,
+      (_, boundary: string, spacing: string) => `${boundary}${spacing}`,
+    );
+    if (nextCss === currentCss) return currentCss;
+    currentCss = nextCss;
+  }
+}
+
 export function normalizeCollaborativeRoomStyleCss(
   css: string,
   version: CollaborativeRoomStyleData["version"],
 ) {
+  const sanitizedCss = removeObsoleteRoomStyleTargets(css);
   return version === 4
-    ? css.slice(0, MAX_ROOM_CSS_LENGTH)
-    : ensureRoomStyleScaffold(css);
+    ? sanitizedCss.slice(0, MAX_ROOM_CSS_LENGTH)
+    : ensureRoomStyleScaffold(sanitizedCss);
 }
 
 export function readLegacyRoomStyleCss(
@@ -196,78 +215,4 @@ export function syncLegacyRoomStyleCharacters(
   // many identical array splices.
   style.chars = limitedCss.split("");
   return true;
-}
-
-/**
- * Per-frame pixel metadata is expensive to maintain across a large room. Most
- * room styles only need the stable pixel selectors/coordinates, so the video
- * renderer enables live level values only when the shared CSS asks for them.
- */
-export function roomStyleUsesLivePixelMetadata(css: string) {
-  const uncommentedCss = stripCssComments(css);
-
-  if (/--pixel-(?:gray|level)\b|data-pixel-level/i.test(uncommentedCss)) {
-    return true;
-  }
-
-  for (const rule of uncommentedCss.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
-    const [, selector = "", declarations = ""] = rule;
-    if (!isVideoPixelSelector(selector)) continue;
-
-    if (pixelRuleNeedsSourceCells(declarations)) return true;
-  }
-
-  return false;
-}
-
-function pixelRuleNeedsSourceCells(declarations: string) {
-  for (const declaration of declarations.matchAll(
-    /(?:^|;)\s*([\w-]+)\s*:/g,
-  )) {
-    const property = (declaration[1] ?? "").toLowerCase();
-    if (!property || property.startsWith("--")) continue;
-
-    const paintsOverlayWithoutSourceCells =
-      property === "color" ||
-      property === "box-shadow" ||
-      property === "text-shadow" ||
-      property === "cursor" ||
-      property === "pointer-events" ||
-      property === "user-select" ||
-      property === "touch-action" ||
-      property === "caret-color" ||
-      property === "accent-color" ||
-      property === "border" ||
-      (property.startsWith("background-") || property === "background") ||
-      (property.startsWith("outline-") || property === "outline") ||
-      (property.startsWith("border-") &&
-        !property.startsWith("border-radius"));
-
-    if (!paintsOverlayWithoutSourceCells) return true;
-  }
-
-  return false;
-}
-
-/** Avoid mounting thousands of style-only spans until room CSS uses them. */
-export function roomStyleUsesVideoPixelOverlay(css: string) {
-  const uncommentedCss = stripCssComments(css);
-  const withoutEmptyScaffoldBlock = uncommentedCss.replace(
-    /\[data-room-part\s*=\s*(?:["']video-pixel["']|video-pixel)\]\s*\{\s*\}/gi,
-    "",
-  );
-
-  return /\[data-room-part\s*=\s*(?:["']video-pixel["']|video-pixel)\]|data-pixel-(?:index|x|y|level)|--pixel-(?:index|x|y|level|gray)\b|\.grayscale-pixel\b/i.test(
-    withoutEmptyScaffoldBlock,
-  );
-}
-
-function isVideoPixelSelector(selector: string) {
-  return /\[data-room-part\s*=\s*(?:["']video-pixel["']|video-pixel)\]|data-pixel-(?:index|x|y|level)|\.grayscale-pixel\b/i.test(
-    selector,
-  );
-}
-
-function stripCssComments(css: string) {
-  return css.replace(/\/\*[\s\S]*?\*\//g, "");
 }

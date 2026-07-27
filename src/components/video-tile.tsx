@@ -15,22 +15,16 @@ import {
 interface VideoTileProps {
   frame: GrayscaleFrame | null;
   isMe?: boolean;
-  livePixelMetadata?: boolean;
-  maxPixelCells?: number;
   name: string;
   payloadRate?: VideoPayloadRate | null;
-  pixelOverlayEnabled?: boolean;
   renderWhenOffscreen?: boolean;
 }
 
 export const VideoTile = memo(function VideoTile({
   frame,
   isMe = false,
-  livePixelMetadata = false,
-  maxPixelCells,
   name,
   payloadRate,
-  pixelOverlayEnabled = true,
   renderWhenOffscreen = false,
 }: VideoTileProps) {
   const normalizedPayloadRate = normalizeVideoPayloadRate(payloadRate);
@@ -161,9 +155,6 @@ export const VideoTile = memo(function VideoTile({
     >
       <GrayscaleCanvas
         frame={frame}
-        livePixelMetadata={livePixelMetadata}
-        maxPixelCells={maxPixelCells}
-        pixelOverlayEnabled={pixelOverlayEnabled}
         renderWhenOffscreen={renderWhenOffscreen}
       />
       <figcaption data-room-part="video-caption">
@@ -192,11 +183,6 @@ function areVideoTilePropsEqual(
   return (
     previous.name === next.name &&
     Boolean(previous.isMe) === Boolean(next.isMe) &&
-    Boolean(previous.livePixelMetadata) ===
-      Boolean(next.livePixelMetadata) &&
-    previous.maxPixelCells === next.maxPixelCells &&
-    (previous.pixelOverlayEnabled ?? true) ===
-      (next.pixelOverlayEnabled ?? true) &&
     Boolean(previous.renderWhenOffscreen) ===
       Boolean(next.renderWhenOffscreen) &&
     framesEqual(previous.frame, next.frame) &&

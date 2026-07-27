@@ -55,10 +55,7 @@ export function JoinSplash({
           </p>
 
           <figure className="preview-frame">
-            <GrayscaleCanvas
-              frame={frame}
-              pixelOverlayEnabled={false}
-            />
+            <GrayscaleCanvas frame={frame} />
           </figure>
 
           <label className="name-field">
