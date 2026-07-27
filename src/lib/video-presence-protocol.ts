@@ -1,3 +1,4 @@
+import { CAPTURE_SETTINGS_LIMITS } from "./capture-settings.ts";
 import type {
   GrayscaleFrame,
   VideoPayloadRate,
@@ -13,8 +14,6 @@ export const VIDEO_PRESENCE_MAX_CHUNKS = 8;
 export const VIDEO_PRESENCE_MAX_BUFFERED_BYTES = 64 * 1_024;
 
 const VIDEO_FRAME_VERSION = 1;
-const MAX_FRAME_WIDTH = 216;
-const MAX_FRAME_HEIGHT = 162;
 const MAX_NAME_LENGTH = 24;
 const MAX_IDENTITY_LENGTH = 512;
 const BACKPRESSURE_RETRY_MS = 25;
@@ -288,8 +287,8 @@ export function parseVideoFrameMetadata(
     value.type !== "video-frame" ||
     value.version !== VIDEO_FRAME_VERSION ||
     !isFrameId(value.frameId) ||
-    !isFrameDimension(value.width, MAX_FRAME_WIDTH) ||
-    !isFrameDimension(value.height, MAX_FRAME_HEIGHT) ||
+    !isFrameDimension(value.width, CAPTURE_SETTINGS_LIMITS.width.max) ||
+    !isFrameDimension(value.height, CAPTURE_SETTINGS_LIMITS.height.max) ||
     !isGrayscaleBits(value.bits) ||
     !isChunkCount(value.chunkCount) ||
     !isPositiveSafeInteger(value.dataLength) ||
@@ -707,8 +706,8 @@ function validateAndNormalizeFrame(frame: GrayscaleFrame) {
   const bits = frame.bits ?? 4;
 
   if (
-    !isFrameDimension(width, MAX_FRAME_WIDTH) ||
-    !isFrameDimension(height, MAX_FRAME_HEIGHT)
+    !isFrameDimension(width, CAPTURE_SETTINGS_LIMITS.width.max) ||
+    !isFrameDimension(height, CAPTURE_SETTINGS_LIMITS.height.max)
   ) {
     throw new RangeError("Invalid grayscale frame dimensions");
   }
@@ -770,7 +769,11 @@ function isFrameDimension(value: unknown, max: number): value is number {
 }
 
 function isGrayscaleBits(value: unknown): value is number {
-  return Number.isInteger(value) && (value as number) >= 1 && (value as number) <= 5;
+  return (
+    Number.isInteger(value) &&
+    (value as number) >= CAPTURE_SETTINGS_LIMITS.grayscaleBits.min &&
+    (value as number) <= CAPTURE_SETTINGS_LIMITS.grayscaleBits.max
+  );
 }
 
 function isChunkCount(value: unknown): value is number {

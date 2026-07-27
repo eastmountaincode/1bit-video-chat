@@ -7,9 +7,9 @@ export interface CaptureSettings {
 
 export const CAPTURE_SETTINGS_LIMITS = {
   frameRate: { min: 1, max: 15 },
-  grayscaleBits: { min: 1, max: 5 },
-  height: { min: 6, max: 162 },
-  width: { min: 8, max: 216 },
+  grayscaleBits: { min: 1, max: 4 },
+  height: { min: 6, max: 96 },
+  width: { min: 8, max: 128 },
 } as const;
 
 export const DEFAULT_CAPTURE_SETTINGS: CaptureSettings = {

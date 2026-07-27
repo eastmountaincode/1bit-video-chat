@@ -31,7 +31,7 @@ test("inlines default frames and chunks larger frames into safe values", () => {
     publishedAt: 1_000,
     sequence: 1,
   });
-  const maximumBatch = createBatch(makeFrame(216, 162, 5), 2);
+  const maximumBatch = createBatch(makeFrame(128, 96, 4), 2);
 
   assert.equal(defaultBatch.chunkCount, 0);
   assert.equal(defaultBatch.messages.length, 1);
@@ -42,8 +42,8 @@ test("inlines default frames and chunks larger frames into safe values", () => {
     parseVideoFrameMetadata(defaultBatch.messages[0]?.value)?.data,
     makeFrame(100, 75, 3).data,
   );
-  assert.equal(maximumBatch.chunkCount, 8);
-  assert.equal(maximumBatch.messages.length, 9);
+  assert.equal(maximumBatch.chunkCount, 3);
+  assert.equal(maximumBatch.messages.length, 4);
 
   for (const batch of [defaultBatch, maximumBatch]) {
     assert.equal(batch.messages.at(-1)?.channel, VIDEO_PRESENCE_CHANNEL);
@@ -98,7 +98,7 @@ test("reads participant names from identity and accepts legacy frame metadata", 
 
 test("rejects malformed metadata, chunks, frames, and server messages", () => {
   const valid = createBatch(makeFrame(100, 75, 3), 1);
-  const chunked = createBatch(makeFrame(216, 162, 5), 2);
+  const chunked = createBatch(makeFrame(128, 96, 4), 2);
   const metadata = valid.messages.at(-1)?.value;
   const chunk = chunked.messages[0]?.value;
 
@@ -115,6 +115,18 @@ test("rejects malformed metadata, chunks, frames, and server messages", () => {
   assert.equal(
     parseVideoFrameChunk({ ...asRecord(chunk), data: "!" }),
     null,
+  );
+  assert.throws(
+    () => createBatch(makeFrame(129, 96, 4), 2),
+    /dimensions/,
+  );
+  assert.throws(
+    () => createBatch(makeFrame(128, 97, 4), 2),
+    /dimensions/,
+  );
+  assert.throws(
+    () => createBatch(makeFrame(128, 96, 5), 2),
+    /bit depth/,
   );
   assert.equal(parseVideoPresenceServerMessage("{bad json"), null);
   assert.throws(
@@ -212,30 +224,30 @@ test("publisher rate-limits frames without penalizing chunked frames", () => {
   const publisher = new LatestVideoPresencePublisher(() => socket, {
     maxHz: 2,
   });
-  const firstLarge = createBatch(makeFrame(216, 162, 5), 1);
-  const secondLarge = createBatch(makeFrame(216, 162, 5), 2);
-  const thirdLarge = createBatch(makeFrame(216, 162, 5), 3);
+  const firstLarge = createBatch(makeFrame(128, 96, 4), 1);
+  const secondLarge = createBatch(makeFrame(128, 96, 4), 2);
+  const thirdLarge = createBatch(makeFrame(128, 96, 4), 3);
   const inline = createBatch(makeFrame(100, 75, 3), 4);
 
-  assert.equal(getVideoPresenceBatchMessageCount(firstLarge), 9);
-  assert.equal(getVideoPresenceBatchMessageCount(inline, 8), 9);
+  assert.equal(getVideoPresenceBatchMessageCount(firstLarge), 4);
+  assert.equal(getVideoPresenceBatchMessageCount(inline, 3), 4);
   assert.equal(publisher.submit(firstLarge, 0).sent, true);
-  assert.equal(socket.sent.length, 9);
+  assert.equal(socket.sent.length, 4);
   assert.equal(publisher.submit(secondLarge, 450).sent, true);
-  assert.equal(socket.sent.length, 18);
+  assert.equal(socket.sent.length, 8);
 
   const windowLimited = publisher.submit(thirdLarge, 900);
   assert.equal(windowLimited.sent, false);
   assert.equal(windowLimited.retryAfterMs, 100);
   assert.equal(publisher.flush(999).retryAfterMs, 1);
   assert.equal(publisher.flush(1_000).sent, true);
-  assert.equal(socket.sent.length, 27);
+  assert.equal(socket.sent.length, 12);
 
   const staleClearsAreCounted = publisher.submit(inline, 1_001);
   assert.equal(staleClearsAreCounted.sent, false);
   assert.equal(staleClearsAreCounted.retryAfterMs, 449);
   assert.equal(publisher.flush(1_450).sent, true);
-  assert.equal(socket.sent.length, 36);
+  assert.equal(socket.sent.length, 16);
 });
 
 class FakeSocket implements VideoPresenceSocketLike {

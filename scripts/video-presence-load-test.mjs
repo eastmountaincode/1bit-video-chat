@@ -3,6 +3,7 @@ import { monitorEventLoopDelay } from "node:perf_hooks";
 
 import PartySocket from "partysocket";
 
+import { CAPTURE_SETTINGS_LIMITS } from "../src/lib/capture-settings.ts";
 import {
   applyVideoPresenceServerMessage,
   assembleVideoPresenceParticipants,
@@ -725,7 +726,13 @@ function readConfig(args) {
   );
 
   return {
-    bits: readBounded(values.bits, 3, 1, 5, "bits"),
+    bits: readBounded(
+      values.bits,
+      3,
+      CAPTURE_SETTINGS_LIMITS.grayscaleBits.min,
+      CAPTURE_SETTINGS_LIMITS.grayscaleBits.max,
+      "bits",
+    ),
     churnDowntimeMs,
     churnIntervalSeconds: readBounded(
       values["churn-interval"],
@@ -744,7 +751,13 @@ function readConfig(args) {
       "duration",
     ),
     fps: readBounded(values.fps, profileDefaults.fps, 1, 20, "fps"),
-    height: readBounded(values.height, 75, 6, 162, "height"),
+    height: readBounded(
+      values.height,
+      75,
+      CAPTURE_SETTINGS_LIMITS.height.min,
+      CAPTURE_SETTINGS_LIMITS.height.max,
+      "height",
+    ),
     host: values.host || "playhtml.spencerc99.workers.dev",
     maximumDuplicateRatio: readBoundedFloat(
       values["maximum-duplicate-ratio"],
@@ -819,7 +832,13 @@ function readConfig(args) {
     ),
     profile,
     seed: readBounded(values.seed, 20_260_722, 0, 0xffffffff, "seed"),
-    width: readBounded(values.width, 100, 8, 216, "width"),
+    width: readBounded(
+      values.width,
+      100,
+      CAPTURE_SETTINGS_LIMITS.width.min,
+      CAPTURE_SETTINGS_LIMITS.width.max,
+      "width",
+    ),
   };
 }
 

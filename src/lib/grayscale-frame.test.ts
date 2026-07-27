@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
+import { CAPTURE_SETTINGS_LIMITS } from "./capture-settings.ts";
 import {
   createGrayscaleFrameEncoder,
   packGrayscaleFrame,
@@ -31,10 +32,18 @@ test("optimized encoder preserves the original bit packing", () => {
     pixels[index] = (index * 47 + 13) % 256;
   }
 
-  for (let bitCount = 1; bitCount <= 5; bitCount += 1) {
+  for (
+    let bitCount = CAPTURE_SETTINGS_LIMITS.grayscaleBits.min;
+    bitCount <= CAPTURE_SETTINGS_LIMITS.grayscaleBits.max;
+    bitCount += 1
+  ) {
     const frame = packGrayscaleFrame(pixels, 13, 7, bitCount);
     assert.equal(frame.data, referencePack(pixels, 13, 7, bitCount));
   }
+
+  const cappedFrame = packGrayscaleFrame(pixels, 13, 7, 5);
+  assert.equal(cappedFrame.bits, 4);
+  assert.equal(cappedFrame.data, referencePack(pixels, 13, 7, 4));
 });
 
 test("reusable encoder overwrites every byte between frames", () => {
@@ -65,6 +74,35 @@ test("decoder reuses ImageData and replaces its pixels", () => {
     255,
     255,
   ]);
+});
+
+test("accepts 128 × 96 frames and rejects larger dimensions", () => {
+  const maximumPixels = new Uint8ClampedArray(128 * 96 * 4);
+
+  assert.doesNotThrow(() => packGrayscaleFrame(maximumPixels, 128, 96, 3));
+  assert.throws(
+    () => packGrayscaleFrame(maximumPixels, 129, 96, 3),
+    /dimensions/,
+  );
+  assert.throws(
+    () => packGrayscaleFrame(maximumPixels, 128, 97, 3),
+    /dimensions/,
+  );
+});
+
+test("decoder rejects frames above the 4-bit grayscale cap", () => {
+  const pixels = new Uint8ClampedArray(13 * 7 * 4);
+
+  assert.throws(
+    () =>
+      unpackGrayscaleFrame({
+        bits: 5,
+        data: referencePack(pixels, 13, 7, 5),
+        height: 7,
+        width: 13,
+      }),
+    /bit depth/,
+  );
 });
 
 function referencePack(

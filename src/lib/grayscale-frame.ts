@@ -1,16 +1,20 @@
-import { DEFAULT_CAPTURE_SETTINGS } from "./capture-settings.ts";
+import {
+  CAPTURE_SETTINGS_LIMITS,
+  DEFAULT_CAPTURE_SETTINGS,
+} from "./capture-settings.ts";
 import type { GrayscaleFrame } from "./shared-types.ts";
 
-const MAX_FRAME_WIDTH = 216;
-const MAX_FRAME_HEIGHT = 162;
-const GRAYSCALE_LEVELS = Array.from({ length: 5 }, (_, index) => {
-  const bitCount = index + 1;
-  const maximumLevel = (1 << bitCount) - 1;
+const GRAYSCALE_LEVELS = Array.from(
+  { length: CAPTURE_SETTINGS_LIMITS.grayscaleBits.max },
+  (_, index) => {
+    const bitCount = index + 1;
+    const maximumLevel = (1 << bitCount) - 1;
 
-  return Uint8Array.from({ length: maximumLevel + 1 }, (_, level) =>
-    Math.round((level / maximumLevel) * 255),
-  );
-});
+    return Uint8Array.from({ length: maximumLevel + 1 }, (_, level) =>
+      Math.round((level / maximumLevel) * 255),
+    );
+  },
+);
 
 export function createGrayscaleFrameEncoder(
   width = DEFAULT_CAPTURE_SETTINGS.width,
@@ -158,15 +162,21 @@ function validateFrameShape(
   height: number,
   grayscaleBits: number,
 ) {
-  const bitCount = Math.max(1, Math.min(5, Math.round(grayscaleBits)));
+  const bitCount = Math.max(
+    CAPTURE_SETTINGS_LIMITS.grayscaleBits.min,
+    Math.min(
+      CAPTURE_SETTINGS_LIMITS.grayscaleBits.max,
+      Math.round(grayscaleBits),
+    ),
+  );
 
   if (
     !Number.isInteger(width) ||
     width <= 0 ||
-    width > MAX_FRAME_WIDTH ||
+    width > CAPTURE_SETTINGS_LIMITS.width.max ||
     !Number.isInteger(height) ||
     height <= 0 ||
-    height > MAX_FRAME_HEIGHT
+    height > CAPTURE_SETTINGS_LIMITS.height.max
   ) {
     throw new RangeError("Invalid grayscale frame dimensions");
   }
@@ -183,15 +193,19 @@ function validatePackedGrayscaleFrame(frame: GrayscaleFrame) {
   if (
     !Number.isInteger(width) ||
     width <= 0 ||
-    width > MAX_FRAME_WIDTH ||
+    width > CAPTURE_SETTINGS_LIMITS.width.max ||
     !Number.isInteger(height) ||
     height <= 0 ||
-    height > MAX_FRAME_HEIGHT
+    height > CAPTURE_SETTINGS_LIMITS.height.max
   ) {
     throw new RangeError("Invalid grayscale frame dimensions");
   }
 
-  if (!Number.isInteger(bitCount) || bitCount < 1 || bitCount > 5) {
+  if (
+    !Number.isInteger(bitCount) ||
+    bitCount < CAPTURE_SETTINGS_LIMITS.grayscaleBits.min ||
+    bitCount > CAPTURE_SETTINGS_LIMITS.grayscaleBits.max
+  ) {
     throw new RangeError("Invalid grayscale frame bit depth");
   }
 

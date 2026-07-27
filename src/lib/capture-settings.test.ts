@@ -7,8 +7,11 @@ import {
   normalizeCaptureSettings,
 } from "./capture-settings.ts";
 
-test("uses fixed capture settings with a 15 fps maximum", () => {
+test("uses fixed capture settings with 128 × 96 and 15 fps maximums", () => {
   assert.equal(CAPTURE_SETTINGS_LIMITS.frameRate.max, 15);
+  assert.equal(CAPTURE_SETTINGS_LIMITS.grayscaleBits.max, 4);
+  assert.equal(CAPTURE_SETTINGS_LIMITS.width.max, 128);
+  assert.equal(CAPTURE_SETTINGS_LIMITS.height.max, 96);
   assert.deepEqual(
     normalizeCaptureSettings(DEFAULT_CAPTURE_SETTINGS),
     DEFAULT_CAPTURE_SETTINGS,
@@ -25,9 +28,9 @@ test("normalizes only the fixed setting boundaries", () => {
     }),
     {
       frameRate: 15,
-      grayscaleBits: 5,
-      height: 162,
-      width: 216,
+      grayscaleBits: 4,
+      height: 96,
+      width: 128,
     },
   );
 

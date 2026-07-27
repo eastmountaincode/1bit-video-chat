@@ -35,8 +35,8 @@ export function HelperPanel({
       <label>
         <span>resolution</span>
         <input
-          max={216}
-          min={8}
+          max={CAPTURE_SETTINGS_LIMITS.width.max}
+          min={CAPTURE_SETTINGS_LIMITS.width.min}
           onChange={(event) => updateWidth(Number(event.target.value))}
           step={4}
           type="range"
@@ -48,8 +48,8 @@ export function HelperPanel({
       <label>
         <span>gray bits</span>
         <input
-          max={5}
-          min={1}
+          max={CAPTURE_SETTINGS_LIMITS.grayscaleBits.max}
+          min={CAPTURE_SETTINGS_LIMITS.grayscaleBits.min}
           onChange={(event) =>
             onChange({
               ...settings,

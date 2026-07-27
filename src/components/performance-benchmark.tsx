@@ -3,7 +3,10 @@
 import { useEffect, useRef, useState } from "react";
 
 import { VideoTile } from "@/components/video-tile";
-import { normalizeCaptureSettings } from "@/lib/capture-settings";
+import {
+  CAPTURE_SETTINGS_LIMITS,
+  normalizeCaptureSettings,
+} from "@/lib/capture-settings";
 import type { GrayscaleFrame } from "@/lib/shared-types";
 
 type BenchmarkStatus =
@@ -564,14 +567,32 @@ function bytesToBase64(bytes: Uint8Array) {
 
 function readBenchmarkConfig(params: URLSearchParams): BenchmarkConfig {
   return {
-    bits: readBoundedNumber(params, "bits", 3, 1, 5),
+    bits: readBoundedNumber(
+      params,
+      "bits",
+      3,
+      CAPTURE_SETTINGS_LIMITS.grayscaleBits.min,
+      CAPTURE_SETTINGS_LIMITS.grayscaleBits.max,
+    ),
     durationMs:
       readBoundedNumber(params, "duration", 10, 1, 30) * 1_000,
     fps: readBoundedNumber(params, "fps", 15, 1, 30),
-    height: readBoundedNumber(params, "height", 75, 6, 162),
+    height: readBoundedNumber(
+      params,
+      "height",
+      75,
+      CAPTURE_SETTINGS_LIMITS.height.min,
+      CAPTURE_SETTINGS_LIMITS.height.max,
+    ),
     participants: readBoundedNumber(params, "participants", 20, 1, 40),
     warmupMs: readBoundedNumber(params, "warmup", 2, 0, 10) * 1_000,
-    width: readBoundedNumber(params, "width", 100, 8, 216),
+    width: readBoundedNumber(
+      params,
+      "width",
+      100,
+      CAPTURE_SETTINGS_LIMITS.width.min,
+      CAPTURE_SETTINGS_LIMITS.width.max,
+    ),
   };
 }
 
