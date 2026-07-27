@@ -60,7 +60,7 @@ export function RoomSidebar({
                 onClick={() => selectPanel(panel)}
                 type="button"
               >
-                {panel}
+                {panel === "style" ? "css" : panel}
               </button>
             ))}
           </nav>
