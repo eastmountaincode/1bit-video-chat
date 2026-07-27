@@ -400,11 +400,13 @@ legend {
   display: flex;
   flex-wrap: wrap-reverse;
   gap: 0.25rem 0.5rem;
+  justify-content: space-between;
 }
 
 .room-current-name {
-  flex: 1 1 8rem;
+  flex: 0 1 auto;
   margin: 0;
+  max-width: 100%;
   min-width: 0;
   overflow: hidden;
   text-align: left;

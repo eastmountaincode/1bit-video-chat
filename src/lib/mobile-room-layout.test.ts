@@ -31,10 +31,14 @@ test("the in-room sidebar does not repeat the site title", () => {
   assert.doesNotMatch(globalCss, /\.room-site-title\s*\{/);
 });
 
-test("the room name stays left-aligned when its toolbar wraps", () => {
+test("the room name sits right on one row and left when the toolbar wraps", () => {
   assert.match(
     globalCss,
-    /\.room-current-name\s*\{[^}]*text-align:\s*left;/s,
+    /\.room-sidebar-toolbar\s*\{[^}]*flex-wrap:\s*wrap-reverse;[^}]*justify-content:\s*space-between;/s,
+  );
+  assert.match(
+    globalCss,
+    /\.room-current-name\s*\{[^}]*flex:\s*0\s+1\s+auto;[^}]*text-align:\s*left;/s,
   );
 });
 
