@@ -316,13 +316,11 @@ legend {
 
 .video-fieldset {
   min-height: calc(100svh - 2rem);
-  position: relative;
 }
 
 .leave-button {
-  position: absolute;
-  right: 0.75rem;
-  top: 0.5rem;
+  display: block;
+  margin-left: auto;
 }
 
 .video-connection-note {
@@ -432,7 +430,6 @@ legend {
 
 .sidebar-tab[aria-pressed="true"] {
   background: #dddddd;
-  border-style: inset;
 }
 
 .sidebar-panels,
@@ -642,6 +639,10 @@ legend {
 
   .chat-open .chat-control-bar {
     left: 0;
+  }
+
+  .chat-panel:not(.chat-open) .chat-control-bar {
+    width: 5rem;
   }
 
   .chat-toggle-button {
