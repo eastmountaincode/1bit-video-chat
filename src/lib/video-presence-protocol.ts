@@ -555,7 +555,7 @@ export class LatestVideoPresencePublisher {
   #maxHz: number;
   #pending = false;
   #publishedChunkCount = 0;
-  #sentMessageTimes: number[] = [];
+  #sentBatchTimes: number[] = [];
 
   constructor(
     getSocket: () => VideoPresenceSocketLike | null,
@@ -588,7 +588,7 @@ export class LatestVideoPresencePublisher {
 
   replay(now = Date.now()): VideoPresenceFlushResult {
     this.#pending = this.#latestBatch !== null;
-    this.#sentMessageTimes = [];
+    this.#sentBatchTimes = [];
     this.#publishedChunkCount = 0;
     return this.flush(now);
   }
@@ -618,18 +618,13 @@ export class LatestVideoPresencePublisher {
     }
 
     const safeNow = Number.isFinite(now) ? now : Date.now();
-    this.#pruneSentMessageTimes(safeNow);
-    const messageCapacity = Math.max(1, Math.floor(this.#maxHz));
-
-    if (serialized.length > messageCapacity) {
-      return { retryAfterMs: RATE_LIMIT_WINDOW_MS, sent: false };
-    }
-
-    const messagesOverCapacity =
-      this.#sentMessageTimes.length + serialized.length - messageCapacity;
-    if (messagesOverCapacity > 0) {
+    this.#pruneSentBatchTimes(safeNow);
+    const batchCapacity = Math.max(1, Math.floor(this.#maxHz));
+    const batchesOverCapacity =
+      this.#sentBatchTimes.length + 1 - batchCapacity;
+    if (batchesOverCapacity > 0) {
       const releasesAt =
-        this.#sentMessageTimes[messagesOverCapacity - 1] +
+        this.#sentBatchTimes[batchesOverCapacity - 1] +
         RATE_LIMIT_WINDOW_MS;
       return {
         retryAfterMs: Math.max(1, Math.ceil(releasesAt - safeNow)),
@@ -653,39 +648,37 @@ export class LatestVideoPresencePublisher {
     try {
       for (const message of serialized) {
         if (socket.send(message) === false) {
-          this.#recordSentMessages(safeNow, sentMessageCount);
+          this.#recordSentBatch(safeNow, sentMessageCount);
           return { retryAfterMs: BACKPRESSURE_RETRY_MS, sent: false };
         }
         sentMessageCount += 1;
       }
     } catch {
-      this.#recordSentMessages(safeNow, sentMessageCount);
+      this.#recordSentBatch(safeNow, sentMessageCount);
       return { retryAfterMs: BACKPRESSURE_RETRY_MS, sent: false };
     }
 
     this.#pending = false;
-    this.#recordSentMessages(safeNow, sentMessageCount);
+    this.#recordSentBatch(safeNow, sentMessageCount);
     this.#publishedChunkCount = batch.chunkCount;
     return { retryAfterMs: null, sent: true };
   }
 
-  #recordSentMessages(at: number, count: number) {
-    if (count <= 0) return;
-    for (let index = 0; index < count; index += 1) {
-      this.#sentMessageTimes.push(at);
-    }
+  #recordSentBatch(at: number, sentMessageCount: number) {
+    if (sentMessageCount <= 0) return;
+    this.#sentBatchTimes.push(at);
   }
 
-  #pruneSentMessageTimes(now: number) {
+  #pruneSentBatchTimes(now: number) {
     const cutoff = now - RATE_LIMIT_WINDOW_MS;
-    const firstActiveIndex = this.#sentMessageTimes.findIndex(
+    const firstActiveIndex = this.#sentBatchTimes.findIndex(
       (sentAt) => sentAt > cutoff,
     );
 
     if (firstActiveIndex === -1) {
-      this.#sentMessageTimes = [];
+      this.#sentBatchTimes = [];
     } else if (firstActiveIndex > 0) {
-      this.#sentMessageTimes.splice(0, firstActiveIndex);
+      this.#sentBatchTimes.splice(0, firstActiveIndex);
     }
   }
 }

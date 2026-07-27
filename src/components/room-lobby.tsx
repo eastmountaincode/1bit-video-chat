@@ -4,13 +4,13 @@ import Image from "next/image";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 
 import {
-  getPublicRooms,
+  getPublicRoomListings,
   getRoomHref,
   MAX_PUBLIC_ROOMS,
   normalizeRoomName,
   parsePublicRoom,
   ROOM_NAME_MAX_LENGTH,
-  type PublicRoom,
+  type PublicRoomListing,
 } from "@/lib/room-directory";
 import { ROOM_LIST_REFRESH_MS } from "@/lib/room-lifecycle";
 
@@ -23,7 +23,7 @@ export function RoomLobby() {
   const [isCreating, setIsCreating] = useState(false);
   const [listError, setListError] = useState<string | null>(null);
   const [name, setName] = useState("");
-  const [rooms, setRooms] = useState<PublicRoom[] | null>(null);
+  const [rooms, setRooms] = useState<PublicRoomListing[] | null>(null);
   const normalizedName = normalizeRoomName(name);
   const isAtCapacity = !rooms || rooms.length >= MAX_PUBLIC_ROOMS;
 
@@ -51,7 +51,7 @@ export function RoomLobby() {
         }
 
         if (!stopped) {
-          setRooms(getPublicRooms(body.rooms));
+          setRooms(getPublicRoomListings(body.rooms));
           setListError(
             response.ok
               ? null
@@ -62,7 +62,9 @@ export function RoomLobby() {
         }
       } catch {
         if (!stopped) {
-          setRooms((currentRooms) => currentRooms ?? getPublicRooms([]));
+          setRooms(
+            (currentRooms) => currentRooms ?? getPublicRoomListings([]),
+          );
           setListError("New rooms are temporarily unavailable.");
         }
       } finally {
@@ -196,14 +198,31 @@ export function RoomLobby() {
               {rooms.map((room) => (
                 <li key={room.id}>
                   <strong>{room.name}</strong>
-                  {/* A fresh document guarantees a fresh PlayHTML room transport. */}
-                  <a
-                    aria-label={`Join ${room.name}`}
-                    className="room-join-link"
-                    href={getRoomHref(room)}
-                  >
-                    Join
-                  </a>
+                  <span className="room-list-actions">
+                    <span className="room-participant-count">
+                      ({room.participantCount}/{room.capacity})
+                    </span>
+                    {/* A fresh document guarantees a fresh PlayHTML room transport. */}
+                    <a
+                      aria-disabled={
+                        room.participantCount >= room.capacity || undefined
+                      }
+                      aria-label={`Join ${room.name}`}
+                      className="room-join-link"
+                      href={
+                        room.participantCount < room.capacity
+                          ? getRoomHref(room)
+                          : undefined
+                      }
+                      tabIndex={
+                        room.participantCount >= room.capacity
+                          ? -1
+                          : undefined
+                      }
+                    >
+                      Join
+                    </a>
+                  </span>
                 </li>
               ))}
             </ul>

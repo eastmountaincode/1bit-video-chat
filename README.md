@@ -4,13 +4,14 @@ A silent low-resolution grayscale video chat built with Next.js and PlayHTML.
 
 - Camera frames default to `100 × 75`, quantized to 3-bit grayscale, bit-packed, and sent at up to 15 fps through a dedicated PlayHTML presence relay.
 - Video presence is ephemeral and disappears when a visitor leaves.
-- Large or high-resolution rooms automatically constrain outgoing resolution and frame rate before they can overload every participant.
+- Capture controls have fixed limits, including a 15 fps maximum, and never change automatically with room size.
 - Global chat uses PlayHTML page data and persists the newest 200 messages.
 - Capture settings are local to each participant and only change their outgoing video.
 - Room style is shared, persistent raw CSS with URL support, stable `data-room-part` targets, a 20,000-character limit, and a global reset.
 - Each viewer can target only their own card with `[data-room-part="video-card"][data-video-side="own"]`.
 - The server-backed lobby lists public rooms and lets anyone create one.
-- User-created rooms expire after their last room-page heartbeat, with a two-minute empty-room grace period; Main room remains permanent.
+- Every room admits at most 20 active participants, with atomic server-side admission and live counts in the directory and camera lobby.
+- User-created rooms expire after their last participant leaves, with a two-minute empty-room grace period; Main room remains permanent.
 - Every room has its own isolated video presence, chat, and shared style state.
 - The original shared state remains available in the default Main room.
 - Entering or leaving a room reloads the document so no prior room transport can leak across the boundary.
@@ -29,7 +30,8 @@ The room server uses Upstash Redis through either
 Set `TELEPATHY_ROOM_REGISTRY_NAMESPACE` to isolate local lifecycle tests.
 
 With the app running, the live room smoke test creates one temporary room,
-sends 20 concurrent heartbeats, and checks missing-room handling:
+admits 20 participants concurrently, rejects the twenty-first, frees and
+reuses one place, and checks missing-room handling:
 
 ```bash
 npm run test:rooms:live
@@ -41,8 +43,8 @@ its list entry and URL stop working.
 In development, `/benchmark?participants=20&fps=15&duration=10`
 runs the real tile renderer with mock participants and reports long tasks,
 animation timing, commit latency, update throughput, memory, and DOM size.
-`width`, `height`, and `bits` query parameters can test the app's adaptive
-large-room settings.
+`width`, `height`, and `bits` query parameters can test the fixed capture
+boundaries.
 
 The transport benchmark uses a unique live PlayHTML room, changes every mock
 camera frame, and fails if delivery, duplication, or reconnect churn crosses

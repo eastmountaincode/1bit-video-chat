@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import { VideoTile } from "@/components/video-tile";
-import { getAdaptiveCaptureSettings } from "@/lib/capture-settings";
+import { normalizeCaptureSettings } from "@/lib/capture-settings";
 import type { GrayscaleFrame } from "@/lib/shared-types";
 
 type BenchmarkStatus =
@@ -161,24 +161,18 @@ export function PerformanceBenchmark() {
       const requestedConfig = readBenchmarkConfig(
         new URLSearchParams(window.location.search),
       );
-      const adaptiveSettings = getAdaptiveCaptureSettings(
-        {
-          frameRate: requestedConfig.fps,
-          grayscaleBits: requestedConfig.bits,
-          height: requestedConfig.height,
-          width: requestedConfig.width,
-        },
-        requestedConfig.participants,
-        {
-          name: `mock ${requestedConfig.participants}`,
-        },
-      );
+      const captureSettings = normalizeCaptureSettings({
+        frameRate: requestedConfig.fps,
+        grayscaleBits: requestedConfig.bits,
+        height: requestedConfig.height,
+        width: requestedConfig.width,
+      });
       const nextConfig: BenchmarkConfig = {
         ...requestedConfig,
-        bits: adaptiveSettings.grayscaleBits,
-        fps: adaptiveSettings.frameRate,
-        height: adaptiveSettings.height,
-        width: adaptiveSettings.width,
+        bits: captureSettings.grayscaleBits,
+        fps: captureSettings.frameRate,
+        height: captureSettings.height,
+        width: captureSettings.width,
       };
       const frameCorpus = createFrameCorpus(
         nextConfig.participants,

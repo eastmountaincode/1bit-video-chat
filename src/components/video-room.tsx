@@ -1,7 +1,7 @@
 "use client";
 
 import { usePlayContext } from "@playhtml/react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import {
   RoomSidebar,
@@ -12,7 +12,6 @@ import { useGrayscaleCamera } from "@/hooks/use-grayscale-camera";
 import { useVideoPresence } from "@/hooks/use-video-presence";
 import {
   DEFAULT_CAPTURE_SETTINGS,
-  getAdaptiveCaptureSettings,
   type CaptureSettings,
 } from "@/lib/capture-settings";
 import type { VideoPayloadRate } from "@/lib/shared-types";
@@ -42,21 +41,12 @@ export function VideoRoom({ name, onLeave, roomName, stream }: VideoRoomProps) {
     participantCount,
     participants: remoteParticipants,
     publishFrame,
-    serverMaxHz,
   } = useVideoPresence({ enabled: !isLoading, name });
   const videoConnectionStatus =
     connectionState === "reconnecting"
       ? "Video connection: reconnecting... Sending and receiving video is paused."
       : videoConnectionError;
-  const effectiveCaptureSettings = useMemo(
-    () =>
-      getAdaptiveCaptureSettings(captureSettings, participantCount, {
-        name,
-        serverMaxHz,
-      }),
-    [captureSettings, name, participantCount, serverMaxHz],
-  );
-  const frame = useGrayscaleCamera(stream, effectiveCaptureSettings);
+  const frame = useGrayscaleCamera(stream, captureSettings);
   const payloadSamplesRef = useRef<VideoPayloadSample[]>([]);
   const lastPayloadRateUiUpdateRef = useRef(0);
   const [localPayloadRate, setLocalPayloadRate] =
@@ -182,11 +172,9 @@ export function VideoRoom({ name, onLeave, roomName, stream }: VideoRoomProps) {
       <RoomSidebar
         activePanel={activePanel}
         captureSettings={captureSettings}
-        effectiveCaptureSettings={effectiveCaptureSettings}
         name={name}
         onCaptureSettingsChange={setCaptureSettings}
         onPanelChange={setActivePanel}
-        participantCount={participantCount}
         roomName={roomName}
         videoConnectionStatus={videoConnectionStatus}
       />

@@ -4,11 +4,13 @@ import test from "node:test";
 import {
   getCreatedRoomDeadline,
   getHeartbeatRoomDeadline,
+  isValidRoomParticipantId,
   isRoomDeadlineActive,
   renewRoomDeadline,
   ROOM_EMPTY_GRACE_MS,
   ROOM_HEARTBEAT_DEADLINE_MS,
   ROOM_HEARTBEAT_INTERVAL_MS,
+  ROOM_PARTICIPANT_LEASE_MS,
 } from "./room-lifecycle.ts";
 
 test("keeps an unjoined room for exactly the two-minute grace period", () => {
@@ -67,4 +69,11 @@ test("one of twenty active clients keeps the shared room alive", () => {
   );
   assert.equal(isRoomDeadlineActive(deadline, deadline - 1), true);
   assert.equal(isRoomDeadlineActive(deadline, deadline), false);
+});
+
+test("participant leases outlast the heartbeat interval", () => {
+  assert.ok(ROOM_PARTICIPANT_LEASE_MS > ROOM_HEARTBEAT_INTERVAL_MS);
+  assert.equal(isValidRoomParticipantId("a".repeat(32)), true);
+  assert.equal(isValidRoomParticipantId("A".repeat(32)), false);
+  assert.equal(isValidRoomParticipantId("a".repeat(31)), false);
 });

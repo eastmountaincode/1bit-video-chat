@@ -206,10 +206,12 @@ test("publisher keeps only the latest frame while closed or backpressured", () =
   ]);
 });
 
-test("publisher budgets every message in a rolling one-second window", () => {
+test("publisher rate-limits frames without penalizing chunked frames", () => {
   const socket = new FakeSocket();
   socket.readyState = 1;
-  const publisher = new LatestVideoPresencePublisher(() => socket);
+  const publisher = new LatestVideoPresencePublisher(() => socket, {
+    maxHz: 2,
+  });
   const firstLarge = createBatch(makeFrame(216, 162, 5), 1);
   const secondLarge = createBatch(makeFrame(216, 162, 5), 2);
   const thirdLarge = createBatch(makeFrame(216, 162, 5), 3);

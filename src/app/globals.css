@@ -190,6 +190,18 @@ legend {
   overflow-wrap: anywhere;
 }
 
+.room-list-actions {
+  align-items: baseline;
+  display: inline-flex;
+  flex: none;
+  gap: 0.75rem;
+}
+
+.room-participant-count {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
 .room-join-link {
   align-items: center;
   background: #efefef;
@@ -204,6 +216,11 @@ legend {
 
 .room-join-link:active {
   background: #dddddd;
+}
+
+.room-join-link[aria-disabled="true"] {
+  color: #777777;
+  cursor: default;
 }
 
 .join-form,
@@ -255,6 +272,7 @@ legend {
 }
 
 .button-row {
+  align-items: baseline;
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem;
@@ -496,12 +514,6 @@ legend {
 
 .settings-panel output {
   text-align: right;
-}
-
-.settings-room-limit {
-  color: var(--muted);
-  font-size: 0.8rem;
-  margin: 0.75rem 0 0;
 }
 
 .style-panel {

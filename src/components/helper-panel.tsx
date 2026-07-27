@@ -1,32 +1,21 @@
 "use client";
 
-import type { CaptureSettings } from "@/lib/capture-settings";
+import {
+  CAPTURE_SETTINGS_LIMITS,
+  type CaptureSettings,
+} from "@/lib/capture-settings";
 
 interface HelperPanelProps {
   active: boolean;
-  effectiveSettings: CaptureSettings;
   onChange: (settings: CaptureSettings) => void;
-  participantCount: number;
   settings: CaptureSettings;
 }
 
 export function HelperPanel({
   active,
-  effectiveSettings,
   onChange,
-  participantCount,
   settings,
 }: HelperPanelProps) {
-  const resolutionAdjusted =
-    effectiveSettings.width !== settings.width ||
-    effectiveSettings.height !== settings.height;
-  const bitDepthAdjusted =
-    effectiveSettings.grayscaleBits !== settings.grayscaleBits;
-  const frameRateAdjusted =
-    effectiveSettings.frameRate !== settings.frameRate;
-  const isAdjusted =
-    resolutionAdjusted || bitDepthAdjusted || frameRateAdjusted;
-
   function updateWidth(width: number) {
     onChange({
       ...settings,
@@ -53,12 +42,7 @@ export function HelperPanel({
           type="range"
           value={settings.width}
         />
-        <output>
-          {settings.width} × {settings.height}
-          {resolutionAdjusted
-            ? ` → ${effectiveSettings.width} × ${effectiveSettings.height}`
-            : ""}
-        </output>
+        <output>{settings.width} × {settings.height}</output>
       </label>
 
       <label>
@@ -76,18 +60,13 @@ export function HelperPanel({
           type="range"
           value={settings.grayscaleBits}
         />
-        <output>
-          {settings.grayscaleBits}
-          {bitDepthAdjusted
-            ? ` → ${effectiveSettings.grayscaleBits}`
-            : ""}
-        </output>
+        <output>{settings.grayscaleBits}</output>
       </label>
 
       <label>
         <span>fps</span>
         <input
-          max={20}
+          max={CAPTURE_SETTINGS_LIMITS.frameRate.max}
           min={1}
           onChange={(event) =>
             onChange({
@@ -99,19 +78,8 @@ export function HelperPanel({
           type="range"
           value={settings.frameRate}
         />
-        <output>
-          {settings.frameRate}
-          {frameRateAdjusted ? ` → ${effectiveSettings.frameRate}` : ""}
-        </output>
+        <output>{settings.frameRate}</output>
       </label>
-
-      {isAdjusted ? (
-        <p aria-live="polite" className="settings-room-limit">
-          Room safeguard active for {participantCount}{" "}
-          {participantCount === 1 ? "participant" : "participants"}. The
-          value after the arrow is being sent.
-        </p>
-      ) : null}
     </fieldset>
   );
 }

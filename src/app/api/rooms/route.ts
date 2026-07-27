@@ -1,6 +1,9 @@
 import { createHash } from "node:crypto";
 
-import { MAIN_ROOM } from "@/lib/room-directory";
+import {
+  createPublicRoomListing,
+  MAIN_ROOM,
+} from "@/lib/room-directory";
 import {
   createRegisteredRoom,
   listPublicRooms,
@@ -31,7 +34,7 @@ export async function GET() {
     return Response.json(
       {
         error: "New rooms are temporarily unavailable.",
-        rooms: [MAIN_ROOM],
+        rooms: [createPublicRoomListing(MAIN_ROOM, 0)],
       },
       { headers: NO_STORE_HEADERS, status: 503 },
     );

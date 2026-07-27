@@ -3,7 +3,9 @@ import test from "node:test";
 
 import {
   createPublicRoom,
+  createPublicRoomListing,
   getPlayHtmlRoomForPath,
+  getPublicRoomListings,
   getPublicRooms,
   getRoomHref,
   isValidRoomId,
@@ -11,8 +13,10 @@ import {
   MAX_PUBLIC_ROOMS,
   normalizeRoomName,
   parsePublicRoom,
+  parsePublicRoomListing,
   PLAYHTML_LEGACY_MAIN_ROOM,
   PLAYHTML_LOBBY_ROOM,
+  ROOM_PARTICIPANT_CAPACITY,
 } from "./room-directory.ts";
 
 test("normalizes public room names without allowing controls or unbounded text", () => {
@@ -81,6 +85,38 @@ test("accepts only complete server room records", () => {
     null,
   );
   assert.equal(parsePublicRoom({ id: "first", name: "First" }, 2_000), null);
+});
+
+test("parses and orders bounded participant counts for the room list", () => {
+  const room = {
+    createdAt: 1_000,
+    id: "first",
+    name: "First",
+  };
+  const listing = createPublicRoomListing(room, 7);
+
+  assert.deepEqual(listing, {
+    ...room,
+    capacity: 20,
+    participantCount: 7,
+  });
+  assert.deepEqual(parsePublicRoomListing(listing, 2_000), listing);
+  assert.equal(
+    parsePublicRoomListing(
+      { ...listing, participantCount: ROOM_PARTICIPANT_CAPACITY + 1 },
+      2_000,
+    ),
+    null,
+  );
+  assert.equal(
+    parsePublicRoomListing({ ...listing, capacity: 25 }, 2_000),
+    null,
+  );
+
+  const visible = getPublicRoomListings([listing], 2_000);
+  assert.equal(visible[0]?.id, MAIN_ROOM.id);
+  assert.equal(visible[0]?.participantCount, 0);
+  assert.deepEqual(visible[1], listing);
 });
 
 test("maps the lobby and every camera route to isolated PlayHTML rooms", () => {

@@ -1,6 +1,7 @@
 export const ROOM_NAME_MAX_LENGTH = 48;
 export const ROOM_ID_MAX_LENGTH = 64;
 export const MAX_PUBLIC_ROOMS = 100;
+export const ROOM_PARTICIPANT_CAPACITY = 20;
 
 export const PLAYHTML_LOBBY_ROOM = "one-bit-video-chat:lobby:v1";
 export const PLAYHTML_LEGACY_MAIN_ROOM = "one-bit-video-chat:main:v1";
@@ -15,6 +16,11 @@ export interface PublicRoom {
   createdAt: number;
   id: string;
   name: string;
+}
+
+export interface PublicRoomListing extends PublicRoom {
+  capacity: number;
+  participantCount: number;
 }
 
 export const MAIN_ROOM: PublicRoom = {
@@ -86,6 +92,38 @@ export function getPublicRooms(
     .slice(0, MAX_PUBLIC_ROOMS);
 }
 
+export function getPublicRoomListings(
+  value: unknown,
+  now = Date.now(),
+): PublicRoomListing[] {
+  const listingsById = new Map<string, PublicRoomListing>([
+    [MAIN_ROOM.id, createPublicRoomListing(MAIN_ROOM, 0)],
+  ]);
+
+  if (Array.isArray(value)) {
+    for (const candidate of value.slice(0, MAX_PUBLIC_ROOMS * 4)) {
+      const listing = parsePublicRoomListing(candidate, now);
+      if (listing) listingsById.set(listing.id, listing);
+    }
+  }
+
+  return getPublicRooms([...listingsById.values()], now).map(
+    (room) =>
+      listingsById.get(room.id) ?? createPublicRoomListing(room, 0),
+  );
+}
+
+export function createPublicRoomListing(
+  room: PublicRoom,
+  participantCount: number,
+): PublicRoomListing {
+  return {
+    ...room,
+    capacity: ROOM_PARTICIPANT_CAPACITY,
+    participantCount: normalizeParticipantCount(participantCount),
+  };
+}
+
 export function getPlayHtmlRoomForPath(pathname: string): string {
   if (pathname === "/" || pathname === "") return PLAYHTML_LOBBY_ROOM;
 
@@ -125,6 +163,28 @@ export function parsePublicRoom(
     : null;
 }
 
+export function parsePublicRoomListing(
+  value: unknown,
+  now = Date.now(),
+): PublicRoomListing | null {
+  const record = asRecord(value);
+  const room = parsePublicRoom(record, now);
+  if (
+    !room ||
+    record?.capacity !== ROOM_PARTICIPANT_CAPACITY ||
+    !Number.isInteger(record.participantCount) ||
+    (record.participantCount as number) < 0 ||
+    (record.participantCount as number) > ROOM_PARTICIPANT_CAPACITY
+  ) {
+    return null;
+  }
+
+  return createPublicRoomListing(
+    room,
+    record.participantCount as number,
+  );
+}
+
 function slugifyRoomName(name: string): string {
   return name
     .normalize("NFKD")
@@ -157,6 +217,14 @@ function isValidRoomTimestamp(value: unknown, now = Date.now()): value is number
     Number.isSafeInteger(value) &&
     value >= 0 &&
     value <= now + MAX_FUTURE_TIMESTAMP_MS
+  );
+}
+
+function normalizeParticipantCount(value: number): number {
+  if (!Number.isFinite(value)) return 0;
+  return Math.max(
+    0,
+    Math.min(ROOM_PARTICIPANT_CAPACITY, Math.floor(value)),
   );
 }
 

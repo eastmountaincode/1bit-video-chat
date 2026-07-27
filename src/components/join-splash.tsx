@@ -7,10 +7,14 @@ import type { CameraPermission } from "@/hooks/use-camera";
 import { useGrayscaleCamera } from "@/hooks/use-grayscale-camera";
 
 interface JoinSplashProps {
+  capacity: number;
+  error: string | null;
+  isJoining: boolean;
+  participantCount: number;
   permission: CameraPermission;
   requestCamera: () => Promise<MediaStream | null>;
   stream: MediaStream | null;
-  onJoin: (name: string) => void;
+  onJoin: (name: string) => Promise<void>;
 }
 
 const permissionLabels: Record<CameraPermission, string> = {
@@ -22,18 +26,26 @@ const permissionLabels: Record<CameraPermission, string> = {
 };
 
 export function JoinSplash({
+  capacity,
+  error,
+  isJoining,
   onJoin,
+  participantCount,
   permission,
   requestCamera,
   stream,
 }: JoinSplashProps) {
   const [name, setName] = useState("");
   const frame = useGrayscaleCamera(stream);
-  const canJoin = name.trim().length > 0 && Boolean(stream && frame);
+  const canJoin =
+    !isJoining &&
+    participantCount < capacity &&
+    name.trim().length > 0 &&
+    Boolean(stream && frame);
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (canJoin) onJoin(name.trim().slice(0, 24));
+    if (canJoin) void onJoin(name.trim().slice(0, 24));
   }
 
   return (
@@ -78,10 +90,19 @@ export function JoinSplash({
                 allow camera
               </button>
             ) : null}
+            <span className="room-participant-count">
+              ({participantCount}/{capacity})
+            </span>
             <button disabled={!canJoin} type="submit">
               join room
             </button>
           </div>
+
+          {error ? (
+            <p className="form-note" role="alert">
+              {error}
+            </p>
+          ) : null}
 
           {permission === "denied" ? (
             <p className="form-note">Allow camera access in browser settings.</p>
