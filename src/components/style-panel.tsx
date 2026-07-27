@@ -18,6 +18,7 @@ import {
   type TextSelection,
   type TextSplice,
 } from "@/lib/collaborative-text";
+import { resolveEditorSelection } from "@/lib/editor-selection";
 import {
   DEFAULT_COLLABORATIVE_ROOM_STYLE,
   DEFAULT_ROOM_STYLE,
@@ -328,10 +329,15 @@ export function StylePanel({ active, name }: StylePanelProps) {
     const previousEntries = editorEntriesRef.current;
     const nextDocumentId = currentDocumentId;
     const textarea = textareaRef.current;
-    const currentSelection =
+    const focusedSelection =
       textarea && document.activeElement === textarea
         ? readSelection(textarea)
-        : selectionRef.current;
+        : null;
+    const currentSelection = resolveEditorSelection(
+      pendingSelectionRef.current,
+      focusedSelection,
+      selectionRef.current,
+    );
     const nextSelection =
       documentIdRef.current === nextDocumentId &&
       previousEntries.length > 0
@@ -357,12 +363,14 @@ export function StylePanel({ active, name }: StylePanelProps) {
 
     if (
       !pendingSelection ||
-      !textarea ||
-      document.activeElement !== textarea
+      !textarea
     ) {
       return;
     }
 
+    // setSelectionRange also updates an unfocused textarea. Keeping the hidden
+    // editor's DOM selection in sync prevents a remote value write from
+    // leaving it at the end when the user returns to the style panel.
     textarea.setSelectionRange(
       pendingSelection.start,
       pendingSelection.end,

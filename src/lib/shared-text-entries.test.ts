@@ -9,7 +9,10 @@ import {
   readTextEntries,
   readTextEntriesSafely,
 } from "./shared-text-entries.ts";
-import { changeTextIndentation } from "./text-indentation.ts";
+import {
+  changeTextIndentation,
+  insertLineBreakWithIndentation,
+} from "./text-indentation.ts";
 
 test("rejects malformed or ambiguous shared entries without throwing", () => {
   assert.equal(readTextEntriesSafely(["bad"]), null);
@@ -58,6 +61,39 @@ test("the caret stays attached to the surviving character after a remote deletio
     mapSelectionByIdentity(base, live, caretAt(1)),
     caretAt(0),
   );
+});
+
+test("Enter after an early opening brace keeps the caret near that brace", () => {
+  const before = [
+    '[data-room-part="room"] {',
+    "  ",
+    "}",
+    "",
+    '[data-room-part="video-area"] {',
+    "  ",
+    "}",
+  ].join("\n");
+  const insertAt = before.indexOf("{") + 1;
+  const base = createTextEntries(before, "base");
+  const edit = insertLineBreakWithIndentation(
+    before,
+    caretAt(insertAt),
+  );
+  const result = mergeTextEntrySplices(
+    base,
+    base,
+    edit.splices,
+    edit.selection,
+    () => "local-enter",
+    20_000,
+  );
+
+  assert.equal(
+    result.text,
+    `${before.slice(0, insertAt)}\n  ${before.slice(insertAt)}`,
+  );
+  assert.deepEqual(result.selection, caretAt(insertAt + 3));
+  assert.ok(result.selection.start < result.text.length);
 });
 
 test("an unchanged character remains editable across large disjoint changes", () => {
