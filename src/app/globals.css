@@ -51,7 +51,7 @@ button:active {
 
 button:disabled {
   color: #777777;
-  cursor: default;
+  cursor: not-allowed;
 }
 
 input,
@@ -220,7 +220,7 @@ legend {
 
 .room-join-link[aria-disabled="true"] {
   color: #777777;
-  cursor: default;
+  cursor: not-allowed;
 }
 
 .join-form,
