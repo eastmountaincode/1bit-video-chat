@@ -60,6 +60,14 @@ textarea {
   padding: 0.2rem 0.3rem;
 }
 
+input[type="range"] {
+  cursor: pointer;
+}
+
+input[type="range"]:disabled {
+  cursor: not-allowed;
+}
+
 textarea {
   resize: vertical;
 }
