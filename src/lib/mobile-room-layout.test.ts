@@ -31,6 +31,13 @@ test("the in-room sidebar does not repeat the site title", () => {
   assert.doesNotMatch(globalCss, /\.room-site-title\s*\{/);
 });
 
+test("the room name stays left-aligned when its toolbar wraps", () => {
+  assert.match(
+    globalCss,
+    /\.room-current-name\s*\{[^}]*text-align:\s*left;/s,
+  );
+});
+
 test("the closed mobile chat bar matches its fixed-width button", () => {
   assert.match(
     globalCss,
