@@ -6,14 +6,29 @@ const globalCss = readFileSync(
   new URL("../app/globals.css", import.meta.url),
   "utf8",
 );
+const roomSidebar = readFileSync(
+  new URL("../components/room-sidebar.tsx", import.meta.url),
+  "utf8",
+);
+const videoRoom = readFileSync(
+  new URL("../components/video-room.tsx", import.meta.url),
+  "utf8",
+);
 
-test("the leave button reserves space above the video cards", () => {
-  const leaveButtonRule = globalCss.match(/\.leave-button\s*\{([^}]*)\}/s)?.[1];
+test("the leave button sits with the room panel buttons", () => {
+  const tabsStart = roomSidebar.indexOf('<nav');
+  const tabsEnd = roomSidebar.indexOf('</nav>', tabsStart);
+  const tabsMarkup = roomSidebar.slice(tabsStart, tabsEnd);
 
-  assert.ok(leaveButtonRule);
-  assert.match(leaveButtonRule, /display:\s*block;/);
-  assert.match(leaveButtonRule, /margin-left:\s*auto;/);
-  assert.doesNotMatch(leaveButtonRule, /position:\s*absolute;/);
+  assert.match(tabsMarkup, />\s*leave room\s*</);
+  assert.match(tabsMarkup, /data-room-part="leave"/);
+  assert.doesNotMatch(videoRoom, />\s*leave room\s*</);
+  assert.doesNotMatch(globalCss, /\.leave-button\s*\{/);
+});
+
+test("the in-room sidebar does not repeat the site title", () => {
+  assert.doesNotMatch(roomSidebar, />\s*Telepathy\s*</);
+  assert.doesNotMatch(globalCss, /\.room-site-title\s*\{/);
 });
 
 test("the closed mobile chat bar matches its fixed-width button", () => {

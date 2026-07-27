@@ -13,6 +13,7 @@ interface RoomSidebarProps {
   captureSettings: CaptureSettings;
   name: string;
   onCaptureSettingsChange: (settings: CaptureSettings) => void;
+  onLeave: () => void;
   onPanelChange: (panel: SidebarPanel) => void;
   roomName: string;
   videoConnectionStatus: string | null;
@@ -25,6 +26,7 @@ export function RoomSidebar({
   captureSettings,
   name,
   onCaptureSettingsChange,
+  onLeave,
   onPanelChange,
   roomName,
   videoConnectionStatus,
@@ -43,9 +45,6 @@ export function RoomSidebar({
   return (
     <aside className="room-sidebar" data-room-part="sidebar">
       <header className="room-sidebar-header">
-        <p className="room-site-title" data-room-part="title">
-          Telepathy
-        </p>
         <div className="room-sidebar-toolbar">
           <nav
             aria-label="Room panels"
@@ -63,6 +62,14 @@ export function RoomSidebar({
                 {panel === "style" ? "css" : panel}
               </button>
             ))}
+            <button
+              className="leave-button"
+              data-room-part="leave"
+              onClick={onLeave}
+              type="button"
+            >
+              leave room
+            </button>
           </nav>
           <p className="room-current-name">
             room: <strong>{roomName}</strong>

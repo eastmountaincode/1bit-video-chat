@@ -143,14 +143,6 @@ export function VideoRoom({ name, onLeave, roomName, stream }: VideoRoomProps) {
       <section className="video-column" data-room-part="video-area">
         <fieldset className="video-fieldset" data-room-part="video-field">
           <legend>video ({participantCount})</legend>
-          <button
-            className="leave-button"
-            data-room-part="leave"
-            onClick={onLeave}
-            type="button"
-          >
-            leave room
-          </button>
           <div className="video-grid" data-room-part="video-grid">
             <VideoTile
               frame={frame}
@@ -174,6 +166,7 @@ export function VideoRoom({ name, onLeave, roomName, stream }: VideoRoomProps) {
         captureSettings={captureSettings}
         name={name}
         onCaptureSettingsChange={setCaptureSettings}
+        onLeave={onLeave}
         onPanelChange={setActivePanel}
         roomName={roomName}
         videoConnectionStatus={videoConnectionStatus}

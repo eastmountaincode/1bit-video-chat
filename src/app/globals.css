@@ -318,11 +318,6 @@ legend {
   min-height: calc(100svh - 2rem);
 }
 
-.leave-button {
-  display: block;
-  margin-left: auto;
-}
-
 .video-connection-note {
   margin: 0;
 }
@@ -398,11 +393,6 @@ legend {
 .room-sidebar-header {
   display: grid;
   gap: 0.5rem;
-}
-
-.room-site-title {
-  margin: 0;
-  text-align: right;
 }
 
 .room-sidebar-toolbar {
@@ -575,22 +565,10 @@ legend {
     align-items: center;
     display: grid;
     gap: 0.5rem;
-    grid-template-columns: minmax(0, 1fr) auto;
-  }
-
-  .room-site-title {
-    grid-column: 2;
-    grid-row: 1;
   }
 
   .room-sidebar-toolbar {
-    grid-column: 1;
-    grid-row: 1;
     min-width: 0;
-  }
-
-  .video-connection-note {
-    grid-column: 1 / -1;
   }
 
   .sidebar-tab-chat {
