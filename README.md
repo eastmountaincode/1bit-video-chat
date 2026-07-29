@@ -1,6 +1,12 @@
 # Telepathy
 
-A silent low-resolution grayscale video chat built with Next.js and PlayHTML.
+A low-resolution grayscale video chat built with Next.js and PlayHTML. Camera
+feeds stay silent; the optional Strudel panel can produce local audio.
+
+The room synthesizer embeds
+[hydra-synth 1.4.0](https://github.com/hydra-synth/hydra-synth) (AGPL).
+The shared pattern editor embeds
+[@strudel/web 1.3.0](https://www.npmjs.com/package/@strudel/web) (AGPL).
 
 - Camera frames default to `100 × 75`, quantized to 3-bit grayscale, bit-packed, and sent at up to 15 fps through a dedicated PlayHTML presence relay.
 - Video presence is ephemeral and disappears when a visitor leaves.
@@ -8,6 +14,8 @@ A silent low-resolution grayscale video chat built with Next.js and PlayHTML.
 - Global chat uses PlayHTML page data and persists the newest 200 messages.
 - Capture settings are local to each participant and only change their outgoing video.
 - Room style is shared, persistent raw CSS with URL support, stable `data-room-part` targets, a 20,000-character limit, and a global reset.
+- The Hydra editor is a shared character-sequence document, so concurrent edits merge live. Running the current draft stores a separate room-wide snapshot and places an isolated Hydra canvas above the CSS room background and behind the room interface; stopping it reveals the CSS background again.
+- The Strudel editor uses the same collaborative character document. Playback runs inside an isolated frame and is opt-in per device, because browsers require each listener to start Web Audio themselves. Standard names such as `bd`, `sd`, and `hh` use Strudel's Dirt Samples map and load their audio files on demand.
 - Each viewer can target only their own card with `[data-room-part="video-card"][data-video-side="own"]`.
 - The server-backed lobby lists public rooms and lets anyone create one.
 - Every room admits at most 20 active participants, with atomic server-side admission and live counts in the directory and camera lobby.
@@ -15,7 +23,7 @@ A silent low-resolution grayscale video chat built with Next.js and PlayHTML.
 - Every room has its own isolated video presence, chat, and shared style state.
 - The original shared state remains available in the default Main room.
 - Entering or leaving a room reloads the document so no prior room transport can leak across the boundary.
-- The right column switches among chat, settings, and style. Press `H` to open or close settings.
+- The right column switches among chat, settings, CSS, Hydra, and Strudel. Press `H` to open or close settings.
 
 ## Development
 

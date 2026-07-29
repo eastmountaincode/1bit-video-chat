@@ -227,7 +227,9 @@ export function RoomLobby() {
               ))}
             </ul>
           ) : (
-            <p role="alert">The room list is unavailable.</p>
+            <p className="error-note" role="alert">
+              The room list is unavailable.
+            </p>
           )}
         </fieldset>
 
@@ -282,7 +284,7 @@ export function RoomLobby() {
           ))}
 
         {error ? (
-          <p className="lobby-note lobby-error" role="alert">
+          <p className="lobby-note error-note" role="alert">
             {error}
           </p>
         ) : null}

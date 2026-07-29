@@ -30,7 +30,8 @@ body {
 
 button,
 input,
-textarea {
+textarea,
+.room-join-link {
   border: 1px solid #000000;
   border-radius: 0;
   background: #ffffff;
@@ -38,18 +39,21 @@ textarea {
   font: inherit;
 }
 
-button {
+button,
+.room-join-link {
   min-height: 1.75rem;
   padding: 0.125rem 0.5rem;
   background: #efefef;
   cursor: pointer;
 }
 
-button:active {
+button:active,
+.room-join-link:active {
   background: #dddddd;
 }
 
-button:disabled {
+button:disabled,
+.room-join-link[aria-disabled="true"] {
   color: #777777;
   cursor: not-allowed;
 }
@@ -161,7 +165,7 @@ legend {
   margin: -0.5rem 0 0;
 }
 
-.lobby-error {
+.error-note {
   color: #8b0000;
 }
 
@@ -212,23 +216,9 @@ legend {
 
 .room-join-link {
   align-items: center;
-  background: #efefef;
-  border: 1px solid #000000;
-  color: inherit;
   display: inline-flex;
   flex: none;
-  min-height: 1.75rem;
-  padding: 0.125rem 0.5rem;
   text-decoration: none;
-}
-
-.room-join-link:active {
-  background: #dddddd;
-}
-
-.room-join-link[aria-disabled="true"] {
-  color: #777777;
-  cursor: not-allowed;
 }
 
 .join-form,
@@ -300,7 +290,19 @@ legend {
 .room-shell {
   display: grid;
   grid-template-columns: minmax(0, 1fr) clamp(18rem, 31vw, 28rem);
+  isolation: isolate;
   min-height: 100svh;
+  position: relative;
+}
+
+.hydra-background {
+  border: 0;
+  height: 100svh;
+  inset: 0;
+  pointer-events: none;
+  position: fixed;
+  width: 100%;
+  z-index: -1;
 }
 
 .video-column {
@@ -519,13 +521,17 @@ legend {
   text-align: right;
 }
 
-.style-panel {
+.style-panel,
+.hydra-panel,
+.strudel-panel {
   display: grid;
   gap: 0.5rem;
   grid-template-rows: minmax(12rem, 1fr) auto auto;
 }
 
-.style-editor {
+.style-editor,
+.hydra-editor,
+.strudel-editor {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-size: 0.8rem;
   height: 100%;
@@ -534,7 +540,9 @@ legend {
   width: 100%;
 }
 
-.style-panel-footer {
+.style-panel-footer,
+.hydra-panel-footer,
+.strudel-panel-footer {
   align-items: center;
   display: flex;
   flex-wrap: wrap;
@@ -545,6 +553,19 @@ legend {
 .style-panel small {
   color: var(--muted);
   font-size: 0.8rem;
+}
+
+.hydra-runtime-note,
+.strudel-runtime-note {
+  font-size: 0.8rem;
+  margin: 0;
+}
+
+.strudel-controls-frame {
+  border: 0;
+  display: block;
+  height: calc(1.3em + 0.25rem + 2px);
+  width: 14rem;
 }
 
 @media (max-width: 720px) {
@@ -578,7 +599,9 @@ legend {
   }
 
   .settings-panel,
-  .style-panel {
+  .style-panel,
+  .hydra-panel,
+  .strudel-panel {
     height: auto;
     margin-top: 0.75rem;
     max-height: 48svh;
@@ -589,7 +612,9 @@ legend {
     height: auto;
   }
 
-  .style-panel {
+  .style-panel,
+  .hydra-panel,
+  .strudel-panel {
     grid-template-rows: minmax(12rem, 1fr) auto auto;
   }
 

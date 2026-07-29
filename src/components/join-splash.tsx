@@ -93,7 +93,7 @@ export function JoinSplash({
           </div>
 
           {error ? (
-            <p className="form-note" role="alert">
+            <p className="form-note error-note" role="alert">
               {error}
             </p>
           ) : null}

@@ -25,6 +25,9 @@ export const ROOM_STYLE_TARGETS = [
   '[data-room-part="message"][data-message-side="other"]',
   '[data-room-part="settings"]',
   '[data-room-part="style"]',
+  '[data-room-part="hydra"]',
+  '[data-room-part="hydra-background"]',
+  '[data-room-part="strudel"]',
 ] as const;
 
 const OBSOLETE_ROOM_STYLE_TARGETS = [

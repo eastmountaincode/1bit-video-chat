@@ -26,6 +26,20 @@ test("the leave button sits with the room panel buttons", () => {
   assert.doesNotMatch(globalCss, /\.leave-button\s*\{/);
 });
 
+test("the synth buttons sit between CSS and leave room", () => {
+  assert.match(
+    roomSidebar,
+    /const panels: SidebarPanel\[\] = \[\s*"chat",\s*"settings",\s*"style",\s*"hydra",\s*"strudel",\s*\];/s,
+  );
+
+  const hydraPanelIndex = roomSidebar.indexOf("<HydraPanel");
+  const strudelPanelIndex = roomSidebar.indexOf("<StrudelPanel");
+  const stylePanelIndex = roomSidebar.indexOf("<StylePanel");
+  assert.ok(stylePanelIndex >= 0);
+  assert.ok(hydraPanelIndex > stylePanelIndex);
+  assert.ok(strudelPanelIndex > hydraPanelIndex);
+});
+
 test("the in-room sidebar does not repeat the site title", () => {
   assert.doesNotMatch(roomSidebar, />\s*Telepathy\s*</);
   assert.doesNotMatch(globalCss, /\.room-site-title\s*\{/);
@@ -61,4 +75,15 @@ test("selected room tabs keep the normal solid button border", () => {
   assert.ok(selectedTabRule);
   assert.match(selectedTabRule, /background:\s*#dddddd;/);
   assert.doesNotMatch(selectedTabRule, /border-style:/);
+});
+
+test("the Strudel control frame matches the shared button box", () => {
+  assert.match(
+    globalCss,
+    /button,\s*\.room-join-link\s*\{[^}]*min-height:\s*1\.75rem;/s,
+  );
+  assert.match(
+    globalCss,
+    /\.strudel-controls-frame\s*\{[^}]*height:\s*calc\(1\.3em \+ 0\.25rem \+ 2px\);/s,
+  );
 });

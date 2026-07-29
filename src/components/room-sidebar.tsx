@@ -1,39 +1,77 @@
 "use client";
 
+import { useState } from "react";
+
 import { ChatPanel } from "@/components/chat-panel";
 import { HelperPanel } from "@/components/helper-panel";
+import { HydraPanel } from "@/components/hydra-panel";
+import { StrudelPanel } from "@/components/strudel-panel";
 import { StylePanel } from "@/components/style-panel";
 import { useMobileLayout } from "@/hooks/use-mobile-layout";
 import type { CaptureSettings } from "@/lib/capture-settings";
+import type {
+  HydraRuntimeStatus,
+  RoomHydraData,
+} from "@/lib/room-hydra";
 
-export type SidebarPanel = "chat" | "settings" | "style";
+export type SidebarPanel =
+  | "chat"
+  | "settings"
+  | "style"
+  | "hydra"
+  | "strudel";
 
 interface RoomSidebarProps {
   activePanel: SidebarPanel;
   captureSettings: CaptureSettings;
+  hydraDisabled: boolean;
+  hydraRuntimeStatus: HydraRuntimeStatus | null;
   name: string;
   onCaptureSettingsChange: (settings: CaptureSettings) => void;
+  onHydraRun: (code: string) => void;
+  onHydraStop: () => void;
   onLeave: () => void;
   onPanelChange: (panel: SidebarPanel) => void;
+  roomHydra: RoomHydraData;
   roomName: string;
+  strudelDisabled: boolean;
   videoConnectionStatus: string | null;
 }
 
-const panels: SidebarPanel[] = ["chat", "settings", "style"];
+const panels: SidebarPanel[] = [
+  "chat",
+  "settings",
+  "style",
+  "hydra",
+  "strudel",
+];
 
 export function RoomSidebar({
   activePanel,
   captureSettings,
+  hydraDisabled,
+  hydraRuntimeStatus,
   name,
   onCaptureSettingsChange,
+  onHydraRun,
+  onHydraStop,
   onLeave,
   onPanelChange,
+  roomHydra,
   roomName,
+  strudelDisabled,
   videoConnectionStatus,
 }: RoomSidebarProps) {
   const isMobile = useMobileLayout();
+  const [strudelRuntimeEnabled, setStrudelRuntimeEnabled] = useState(
+    activePanel === "strudel",
+  );
 
   function selectPanel(panel: SidebarPanel) {
+    if (panel === "strudel") {
+      setStrudelRuntimeEnabled(true);
+    }
+
     if (isMobile && panel !== "chat" && activePanel === panel) {
       onPanelChange("chat");
       return;
@@ -90,6 +128,21 @@ export function RoomSidebar({
           settings={captureSettings}
         />
         <StylePanel active={activePanel === "style"} name={name} />
+        <HydraPanel
+          active={activePanel === "hydra"}
+          disabled={hydraDisabled}
+          hydra={roomHydra}
+          name={name}
+          onRun={onHydraRun}
+          onStop={onHydraStop}
+          runtimeStatus={hydraRuntimeStatus}
+        />
+        <StrudelPanel
+          active={activePanel === "strudel"}
+          disabled={strudelDisabled}
+          name={name}
+          runtimeEnabled={strudelRuntimeEnabled}
+        />
       </div>
     </aside>
   );

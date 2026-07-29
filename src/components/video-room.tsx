@@ -1,8 +1,9 @@
 "use client";
 
-import { usePlayContext } from "@playhtml/react";
-import { useEffect, useRef, useState } from "react";
+import { usePageData, usePlayContext } from "@playhtml/react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
+import { HydraBackground } from "@/components/hydra-background";
 import {
   RoomSidebar,
   type SidebarPanel,
@@ -14,6 +15,12 @@ import {
   DEFAULT_CAPTURE_SETTINGS,
   type CaptureSettings,
 } from "@/lib/capture-settings";
+import {
+  DEFAULT_ROOM_HYDRA,
+  normalizeRoomHydraData,
+  type HydraRuntimeStatus,
+  type RoomHydraData,
+} from "@/lib/room-hydra";
 import type { VideoPayloadRate } from "@/lib/shared-types";
 import {
   measureVideoPayloadBytes,
@@ -35,6 +42,13 @@ export function VideoRoom({ name, onLeave, roomName, stream }: VideoRoomProps) {
   );
   const [activePanel, setActivePanel] = useState<SidebarPanel>("chat");
   const { isLoading } = usePlayContext();
+  const [rawRoomHydra, setRoomHydra] = usePageData<RoomHydraData>(
+    "room-hydra:v1",
+    DEFAULT_ROOM_HYDRA,
+  );
+  const roomHydra = normalizeRoomHydraData(rawRoomHydra);
+  const [hydraRuntimeStatus, setHydraRuntimeStatus] =
+    useState<HydraRuntimeStatus | null>(null);
   const {
     connectionState,
     error: videoConnectionError,
@@ -134,12 +148,46 @@ export function VideoRoom({ name, onLeave, roomName, stream }: VideoRoomProps) {
     };
   }, []);
 
+  const runHydra = useCallback(
+    (code: string) => {
+      if (isLoading) return;
+
+      setRoomHydra((draft) => {
+        draft.code = code;
+        draft.enabled = true;
+        draft.updatedAt = Date.now();
+        draft.updatedBy = name;
+        draft.version = 1;
+      });
+    },
+    [isLoading, name, setRoomHydra],
+  );
+
+  const stopHydra = useCallback(() => {
+    if (isLoading) return;
+
+    setRoomHydra((draft) => {
+      draft.enabled = false;
+      draft.updatedAt = Date.now();
+      draft.updatedBy = name;
+      draft.version = 1;
+    });
+  }, [isLoading, name, setRoomHydra]);
+
   return (
     <main
       className="room-shell"
+      data-hydra-enabled={roomHydra.enabled ? "true" : "false"}
       data-room-part="room"
       data-video-connection={connectionState}
     >
+      {roomHydra.enabled ? (
+        <HydraBackground
+          code={roomHydra.code}
+          onStatusChange={setHydraRuntimeStatus}
+          updatedAt={roomHydra.updatedAt}
+        />
+      ) : null}
       <section className="video-column" data-room-part="video-area">
         <fieldset className="video-fieldset" data-room-part="video-field">
           <legend>video ({participantCount})</legend>
@@ -164,11 +212,19 @@ export function VideoRoom({ name, onLeave, roomName, stream }: VideoRoomProps) {
       <RoomSidebar
         activePanel={activePanel}
         captureSettings={captureSettings}
+        hydraDisabled={isLoading}
+        hydraRuntimeStatus={
+          roomHydra.enabled ? hydraRuntimeStatus : null
+        }
         name={name}
         onCaptureSettingsChange={setCaptureSettings}
+        onHydraRun={runHydra}
+        onHydraStop={stopHydra}
         onLeave={onLeave}
         onPanelChange={setActivePanel}
+        roomHydra={roomHydra}
         roomName={roomName}
+        strudelDisabled={isLoading}
         videoConnectionStatus={videoConnectionStatus}
       />
     </main>
