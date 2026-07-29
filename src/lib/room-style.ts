@@ -17,6 +17,7 @@ export const ROOM_STYLE_TARGETS = [
   '[data-room-part="video-caption"]',
   '[data-room-part="video-rate"]',
   '[data-room-part="leave"]',
+  '[data-room-part="divider"]',
   '[data-room-part="sidebar"]',
   '[data-room-part="sidebar-tabs"]',
   '[data-room-part="chat"]',

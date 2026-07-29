@@ -288,11 +288,28 @@ legend {
 }
 
 .room-shell {
+  --room-sidebar-width: clamp(18rem, 31vw, 28rem);
+
   display: grid;
-  grid-template-columns: minmax(0, 1fr) clamp(18rem, 31vw, 28rem);
+  grid-template-columns:
+    minmax(20rem, 1fr)
+    1px
+    minmax(
+      18rem,
+      min(var(--room-sidebar-width), calc(100vw - 20rem - 1px))
+    );
   isolation: isolate;
   min-height: 100svh;
   position: relative;
+}
+
+.room-shell[data-sidebar-resizing="true"] {
+  cursor: col-resize;
+  user-select: none;
+}
+
+.room-shell[data-sidebar-resizing="true"] iframe {
+  pointer-events: none;
 }
 
 .hydra-background {
@@ -380,8 +397,28 @@ legend {
   white-space: nowrap;
 }
 
+.room-resize-handle {
+  align-self: stretch;
+  background:
+    linear-gradient(
+      to right,
+      transparent 6px,
+      #000000 6px,
+      #000000 7px,
+      transparent 7px
+    );
+  cursor: col-resize;
+  height: 100svh;
+  justify-self: center;
+  margin-inline: -6px;
+  position: sticky;
+  top: 0;
+  touch-action: none;
+  width: 13px;
+  z-index: 50;
+}
+
 .room-sidebar {
-  border-left: 1px solid #000000;
   display: grid;
   gap: 0.75rem;
   grid-template-rows: auto minmax(0, 1fr);
@@ -555,8 +592,7 @@ legend {
   font-size: 0.8rem;
 }
 
-.hydra-runtime-note,
-.strudel-runtime-note {
+.hydra-runtime-note {
   font-size: 0.8rem;
   margin: 0;
 }
@@ -582,6 +618,10 @@ legend {
     order: -1;
     padding: 1rem 1rem 0;
     position: static;
+  }
+
+  .room-resize-handle {
+    display: none;
   }
 
   .room-sidebar-header {

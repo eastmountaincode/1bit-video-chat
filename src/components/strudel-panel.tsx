@@ -1,14 +1,16 @@
 "use client";
 
-import { useId, useState } from "react";
+import { useId, useRef } from "react";
 
-import { StrudelRuntimeControls } from "@/components/strudel-runtime-controls";
+import {
+  StrudelRuntimeControls,
+  type StrudelRuntimeControlsHandle,
+} from "@/components/strudel-runtime-controls";
 import { useCollaborativeCodeEditor } from "@/hooks/use-collaborative-code-editor";
 import {
   DEFAULT_COLLABORATIVE_ROOM_STRUDEL,
   DEFAULT_STRUDEL_CODE,
   MAX_STRUDEL_CODE_LENGTH,
-  type StrudelRuntimeStatus,
 } from "@/lib/room-strudel";
 
 interface StrudelPanelProps {
@@ -25,8 +27,8 @@ export function StrudelPanel({
   runtimeEnabled,
 }: StrudelPanelProps) {
   const editorInstructionsId = useId();
-  const [runtimeStatus, setRuntimeStatus] =
-    useState<StrudelRuntimeStatus | null>(null);
+  const runtimeControlsRef =
+    useRef<StrudelRuntimeControlsHandle>(null);
   const {
     controlsDisabled,
     editorDisabled,
@@ -47,10 +49,9 @@ export function StrudelPanel({
     initialCode: DEFAULT_STRUDEL_CODE,
     maxLength: MAX_STRUDEL_CODE_LENGTH,
     name,
+    onRunShortcut: (code) => runtimeControlsRef.current?.update(code),
+    onStopShortcut: () => runtimeControlsRef.current?.stop(),
   });
-  const error =
-    runtimeStatus?.state === "error" ? runtimeStatus.error : null;
-
   return (
     <fieldset
       className="strudel-panel sidebar-panel"
@@ -60,6 +61,7 @@ export function StrudelPanel({
       <legend>strudel</legend>
       <textarea
         aria-describedby={editorInstructionsId}
+        aria-keyshortcuts="Control+Enter Meta+Enter Control+. Meta+."
         aria-label="room strudel pattern"
         autoCapitalize="off"
         autoComplete="off"
@@ -79,21 +81,19 @@ export function StrudelPanel({
       />
       <span className="visually-hidden" id={editorInstructionsId}>
         Edits are shared with the room. Run and stop affect audio on this
-        device. Enter keeps the current indentation. Tab indents; Shift+Tab
-        outdents. Press Escape, then Tab to leave the editor.
+        device. Control and Enter, or Command and Enter, updates the current
+        pattern without resetting its cycle. Control and Period, or Command
+        and Period, stops it. Enter keeps the current indentation. Tab
+        indents; Shift+Tab outdents. Press Escape, then Tab to leave the
+        editor.
       </span>
-      {error ? (
-        <p className="strudel-runtime-note error-note" role="alert">
-          strudel error: {error}
-        </p>
-      ) : null}
       <div className="strudel-panel-footer">
         {runtimeEnabled ? (
           <StrudelRuntimeControls
             canRun={!runDisabled}
             code={editorValue}
+            controlRef={runtimeControlsRef}
             disabled={controlsDisabled}
-            onStatusChange={setRuntimeStatus}
           />
         ) : null}
       </div>

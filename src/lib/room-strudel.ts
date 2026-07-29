@@ -22,14 +22,22 @@ export const DEFAULT_COLLABORATIVE_ROOM_STRUDEL: CollaborativeRoomStrudelData =
     version: 1,
   };
 
-export interface StrudelFrameCommand {
+interface StrudelCodeFrameCommand {
   canRun: boolean;
   code: string;
   disabled: boolean;
   revision: string;
   source: "telepathy-strudel";
-  type: "stage";
 }
+
+export type StrudelFrameCommand =
+  | (StrudelCodeFrameCommand & {
+      type: "stage" | "update";
+    })
+  | {
+      source: "telepathy-strudel";
+      type: "stop";
+    };
 
 export type StrudelFrameEvent =
   | {
@@ -46,18 +54,6 @@ export type StrudelFrameEvent =
   | {
       source: "telepathy-strudel";
       type: "stopped";
-    };
-
-export type StrudelRuntimeStatus =
-  | {
-      state: "running";
-    }
-  | {
-      state: "stopped";
-    }
-  | {
-      error: string;
-      state: "error";
     };
 
 export function createRoomStrudelDocument(
@@ -94,9 +90,13 @@ export function isStrudelFrameCommand(
   if (!value || typeof value !== "object") return false;
   const command = value as Partial<StrudelFrameCommand>;
 
+  if (command.source !== "telepathy-strudel") return false;
+  if (command.type === "stop") return true;
+  if (command.type !== "stage" && command.type !== "update") {
+    return false;
+  }
+
   return (
-    command.source === "telepathy-strudel" &&
-    command.type === "stage" &&
     typeof command.code === "string" &&
     command.code.length <= MAX_STRUDEL_CODE_LENGTH &&
     typeof command.revision === "string" &&

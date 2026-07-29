@@ -102,7 +102,7 @@ export function HydraPanel({
             onClick={onStop}
             type="button"
           >
-            stop hydra
+            stop
           </button>
         ) : null}
         <button
@@ -110,7 +110,7 @@ export function HydraPanel({
           onClick={runCurrentCode}
           type="button"
         >
-          run hydra
+          {hydra.enabled ? "update" : "run"}
         </button>
       </div>
     </fieldset>

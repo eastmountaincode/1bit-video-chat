@@ -1,3 +1,5 @@
+import { STRUDEL_SAMPLE_CATALOGS } from "./strudel-sample-catalogs.ts";
+
 export const STRUDEL_FRAME_DOCUMENT = `<!doctype html>
 <html lang="en">
   <head>
@@ -48,20 +50,24 @@ export const STRUDEL_FRAME_DOCUMENT = `<!doctype html>
     </style>
   </head>
   <body>
-    <button disabled hidden id="stop" type="button">stop strudel</button>
-    <button disabled id="run" type="button">run strudel</button>
+    <button disabled hidden id="stop" type="button">stop</button>
+    <button disabled id="run" type="button">run</button>
     <script src="/strudel-web-1.3.0/index.js"></script>
     <script>
       (() => {
         const SOURCE = "telepathy-strudel";
         const MAX_CODE_LENGTH = 10000;
+        const SAMPLE_CATALOGS = ${JSON.stringify(STRUDEL_SAMPLE_CATALOGS)};
         const runButton = document.querySelector("#run");
         const stopButton = document.querySelector("#stop");
         let canRun = false;
         let controlsDisabled = true;
+        let evaluating = false;
+        let evaluationGeneration = 0;
         let evaluationError = null;
         let initialized = false;
         let running = false;
+        let sampleCatalogsPromise = null;
         let stagedCode = "";
         let stagedRevision = "";
 
@@ -76,8 +82,13 @@ export const STRUDEL_FRAME_DOCUMENT = `<!doctype html>
         }
 
         function updateButtons() {
+          runButton.textContent = running ? "update" : "run";
           runButton.disabled =
-            !initialized || controlsDisabled || !canRun || !stagedCode.trim();
+            !initialized ||
+            controlsDisabled ||
+            evaluating ||
+            !canRun ||
+            !stagedCode.trim();
           stopButton.disabled = !initialized || controlsDisabled || !running;
           stopButton.hidden = !running;
         }
@@ -100,13 +111,25 @@ export const STRUDEL_FRAME_DOCUMENT = `<!doctype html>
           return;
         }
 
-        const initialization = Promise.resolve(
+        function loadSampleCatalogs() {
+          if (!sampleCatalogsPromise) {
+            sampleCatalogsPromise = Promise.all(
+              SAMPLE_CATALOGS.map(({ baseUrl, manifestUrl }) =>
+                api.samples(manifestUrl, baseUrl),
+              ),
+            ).catch((error) => {
+              sampleCatalogsPromise = null;
+              throw error;
+            });
+          }
+          return sampleCatalogsPromise;
+        }
+
+        const initialization = Promise.resolve().then(() =>
           api.initStrudel({
             onEvalError(error) {
               evaluationError = errorMessage(error);
             },
-            prebake: () =>
-              api.samples("github:tidalcycles/dirt-samples"),
           }),
         );
 
@@ -126,13 +149,81 @@ export const STRUDEL_FRAME_DOCUMENT = `<!doctype html>
           },
         );
 
+        async function evaluatePattern(code, revision, restart) {
+          if (
+            evaluating ||
+            controlsDisabled ||
+            !canRun ||
+            !code.trim()
+          ) {
+            return;
+          }
+
+          const generation = ++evaluationGeneration;
+          const wasRunning = running;
+          let restarted = false;
+          evaluating = true;
+          evaluationError = null;
+          updateButtons();
+
+          try {
+            await initialization;
+            await api.initAudio();
+            await loadSampleCatalogs();
+            if (generation !== evaluationGeneration) return;
+            if (restart) {
+              api.hush();
+              restarted = true;
+            }
+            await api.evaluate(code);
+            if (evaluationError) {
+              throw new Error(evaluationError);
+            }
+            if (generation !== evaluationGeneration) return;
+            running = true;
+            send({ ok: true, revision, type: "result" });
+          } catch (error) {
+            if (generation !== evaluationGeneration) return;
+            running = restarted ? false : wasRunning;
+            send({
+              error: errorMessage(error),
+              ok: false,
+              revision,
+              type: "result",
+            });
+          } finally {
+            if (generation !== evaluationGeneration) {
+              api.hush();
+            }
+            evaluating = false;
+            updateButtons();
+          }
+        }
+
+        function stopPattern() {
+          evaluationGeneration += 1;
+          api.hush();
+          running = false;
+          updateButtons();
+          send({ type: "stopped" });
+        }
+
         window.addEventListener("message", (event) => {
           const command = event.data;
           if (
             event.source !== window.parent ||
             !command ||
-            command.source !== SOURCE ||
-            command.type !== "stage" ||
+            command.source !== SOURCE
+          ) {
+            return;
+          }
+
+          if (command.type === "stop") {
+            stopPattern();
+            return;
+          }
+          if (
+            (command.type !== "stage" && command.type !== "update") ||
             typeof command.code !== "string" ||
             command.code.length > MAX_CODE_LENGTH ||
             typeof command.revision !== "string" ||
@@ -147,45 +238,24 @@ export const STRUDEL_FRAME_DOCUMENT = `<!doctype html>
           canRun = command.canRun;
           controlsDisabled = command.disabled;
           updateButtons();
+
+          if (command.type === "update") {
+            void evaluatePattern(
+              command.code,
+              command.revision,
+              false,
+            );
+          }
         });
 
-        runButton.addEventListener("click", async () => {
+        runButton.addEventListener("click", () => {
           if (runButton.disabled) return;
-
-          const code = stagedCode;
-          const revision = stagedRevision;
-          runButton.disabled = true;
-          evaluationError = null;
-
-          try {
-            await initialization;
-            await api.initAudio();
-            api.hush();
-            await api.evaluate(code);
-            if (evaluationError) {
-              throw new Error(evaluationError);
-            }
-            running = true;
-            send({ ok: true, revision, type: "result" });
-          } catch (error) {
-            running = false;
-            send({
-              error: errorMessage(error),
-              ok: false,
-              revision,
-              type: "result",
-            });
-          } finally {
-            updateButtons();
-          }
+          void evaluatePattern(stagedCode, stagedRevision, true);
         });
 
         stopButton.addEventListener("click", () => {
           if (stopButton.disabled) return;
-          api.hush();
-          running = false;
-          updateButtons();
-          send({ type: "stopped" });
+          stopPattern();
         });
 
         updateButtons();

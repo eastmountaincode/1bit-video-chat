@@ -4,6 +4,7 @@ import { usePageData, usePlayContext } from "@playhtml/react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { HydraBackground } from "@/components/hydra-background";
+import { RoomResizeHandle } from "@/components/room-resize-handle";
 import {
   RoomSidebar,
   type SidebarPanel,
@@ -63,6 +64,7 @@ export function VideoRoom({ name, onLeave, roomName, stream }: VideoRoomProps) {
   const frame = useGrayscaleCamera(stream, captureSettings);
   const payloadSamplesRef = useRef<VideoPayloadSample[]>([]);
   const lastPayloadRateUiUpdateRef = useRef(0);
+  const roomShellRef = useRef<HTMLElement>(null);
   const [localPayloadRate, setLocalPayloadRate] =
     useState<VideoPayloadRate | null>(null);
 
@@ -180,6 +182,7 @@ export function VideoRoom({ name, onLeave, roomName, stream }: VideoRoomProps) {
       data-hydra-enabled={roomHydra.enabled ? "true" : "false"}
       data-room-part="room"
       data-video-connection={connectionState}
+      ref={roomShellRef}
     >
       {roomHydra.enabled ? (
         <HydraBackground
@@ -188,7 +191,11 @@ export function VideoRoom({ name, onLeave, roomName, stream }: VideoRoomProps) {
           updatedAt={roomHydra.updatedAt}
         />
       ) : null}
-      <section className="video-column" data-room-part="video-area">
+      <section
+        className="video-column"
+        data-room-part="video-area"
+        id="room-video-area"
+      >
         <fieldset className="video-fieldset" data-room-part="video-field">
           <legend>video ({participantCount})</legend>
           <div className="video-grid" data-room-part="video-grid">
@@ -209,6 +216,7 @@ export function VideoRoom({ name, onLeave, roomName, stream }: VideoRoomProps) {
           </div>
         </fieldset>
       </section>
+      <RoomResizeHandle roomShellRef={roomShellRef} />
       <RoomSidebar
         activePanel={activePanel}
         captureSettings={captureSettings}

@@ -81,7 +81,11 @@ export function RoomSidebar({
   }
 
   return (
-    <aside className="room-sidebar" data-room-part="sidebar">
+    <aside
+      className="room-sidebar"
+      data-room-part="sidebar"
+      id="room-interactive-panel"
+    >
       <header className="room-sidebar-header">
         <div className="room-sidebar-toolbar">
           <nav

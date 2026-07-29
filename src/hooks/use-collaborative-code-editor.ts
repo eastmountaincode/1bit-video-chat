@@ -16,6 +16,7 @@ import {
   createCollaborativeCodeDocument,
   type CollaborativeCodeData,
 } from "@/lib/collaborative-code";
+import { getCodeEditorShortcut } from "@/lib/code-editor-shortcut";
 import {
   computeTextSplice,
   type TextSelection,
@@ -43,6 +44,7 @@ interface CollaborativeCodeEditorOptions {
   maxLength: number;
   name: string;
   onRunShortcut?: (code: string) => void;
+  onStopShortcut?: () => void;
 }
 
 function readSelection(textarea: HTMLTextAreaElement): TextSelection {
@@ -71,6 +73,7 @@ export function useCollaborativeCodeEditor({
   maxLength,
   name,
   onRunShortcut,
+  onStopShortcut,
 }: CollaborativeCodeEditorOptions) {
   const [sharedDocument, setSharedDocument] =
     usePageData<CollaborativeCodeData>(channelName, defaultData);
@@ -429,15 +432,24 @@ export function useCollaborativeCodeEditor({
   }
 
   function handleKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
-    if (
-      onRunShortcut &&
-      event.key === "Enter" &&
-      (event.ctrlKey || event.metaKey) &&
-      !event.nativeEvent.isComposing &&
-      !isComposingRef.current
-    ) {
+    const shortcut = getCodeEditorShortcut({
+      altKey: event.altKey,
+      code: event.code,
+      ctrlKey: event.ctrlKey,
+      isComposing:
+        event.nativeEvent.isComposing || isComposingRef.current,
+      key: event.key,
+      metaKey: event.metaKey,
+    });
+
+    if (shortcut === "run" && onRunShortcut) {
       event.preventDefault();
       runCurrentCode();
+      return;
+    }
+    if (shortcut === "stop" && onStopShortcut) {
+      event.preventDefault();
+      onStopShortcut();
       return;
     }
 

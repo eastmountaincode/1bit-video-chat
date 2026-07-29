@@ -251,6 +251,18 @@ test("does not add a transient loading row to the Hydra editor", () => {
   assert.doesNotMatch(hydraPanel, /hydra loading/i);
 });
 
+test("uses minimal controls that become update and stop while running", () => {
+  assert.match(hydraPanel, />\s*stop\s*<\/button>/);
+  assert.match(
+    hydraPanel,
+    /\{hydra\.enabled \? "update" : "run"\}/,
+  );
+  assert.doesNotMatch(
+    hydraPanel,
+    />\s*(?:run|stop) hydra\s*</i,
+  );
+});
+
 test("backs the Hydra editor with the shared character document", () => {
   assert.match(hydraPanel, /room-hydra-code:v1/);
   assert.match(hydraPanel, /onRunShortcut:\s*onRun/);
