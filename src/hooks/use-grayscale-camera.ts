@@ -26,9 +26,15 @@ export function useGrayscaleCamera(
 
     if (!context) return;
 
+    const videoTrack = stream.getVideoTracks()[0];
+    if (!videoTrack) return;
+
     canvas.width = width;
     canvas.height = height;
-    context.imageSmoothingEnabled = false;
+    // The displayed canvas remains pixelated. Smoothing only prevents a
+    // moving source crop from aliasing while it is reduced to the tiny frame.
+    context.imageSmoothingEnabled = true;
+    context.imageSmoothingQuality = "high";
     const encodeFrame = createGrayscaleFrameEncoder(
       width,
       height,
@@ -48,12 +54,19 @@ export function useGrayscaleCamera(
       if (cancelled) return;
 
       if (
+        videoTrack.readyState === "live" &&
+        !videoTrack.muted &&
         video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA &&
         now - lastCaptureAt >= 1000 / frameRate
       ) {
-        lastCaptureAt = now;
         const sourceWidth = video.videoWidth;
         const sourceHeight = video.videoHeight;
+        if (sourceWidth <= 0 || sourceHeight <= 0) {
+          animationFrame = window.requestAnimationFrame(capture);
+          return;
+        }
+
+        lastCaptureAt = now;
         const sourceAspect = sourceWidth / sourceHeight;
         const targetAspect = width / height;
         let cropX = 0;
@@ -69,28 +82,38 @@ export function useGrayscaleCamera(
           cropY = (sourceHeight - cropHeight) / 2;
         }
 
+        let drewFrame = false;
         context.save();
-        context.translate(width, 0);
-        context.scale(-1, 1);
-        context.drawImage(
-          video,
-          cropX,
-          cropY,
-          cropWidth,
-          cropHeight,
-          0,
-          0,
-          width,
-          height,
-        );
-        context.restore();
+        try {
+          context.translate(width, 0);
+          context.scale(-1, 1);
+          context.drawImage(
+            video,
+            cropX,
+            cropY,
+            cropWidth,
+            cropHeight,
+            0,
+            0,
+            width,
+            height,
+          );
+          drewFrame = true;
+        } catch {
+          // Camera effects can briefly reconfigure the source. Keep the last
+          // complete frame and retry on the next animation frame.
+        } finally {
+          context.restore();
+        }
 
-        const image = context.getImageData(0, 0, width, height);
-        const nextFrame = encodeFrame(image.data);
+        if (drewFrame) {
+          const image = context.getImageData(0, 0, width, height);
+          const nextFrame = encodeFrame(image.data);
 
-        if (nextFrame.data !== lastFrameData) {
-          lastFrameData = nextFrame.data;
-          setFrame(nextFrame);
+          if (nextFrame.data !== lastFrameData) {
+            lastFrameData = nextFrame.data;
+            setFrame(nextFrame);
+          }
         }
       }
 
