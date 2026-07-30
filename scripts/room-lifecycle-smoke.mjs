@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 
 const args = new Set(process.argv.slice(2));
 const waitForExpiry = args.has("--wait-for-expiry");
+const waitForPersistence = args.has("--wait-for-persistence");
 const baseUrlArgument = process.argv
   .slice(2)
   .find((argument) => argument.startsWith("--base-url="));
@@ -15,6 +16,11 @@ assert.equal(
   baseUrl.protocol === "http:" || baseUrl.protocol === "https:",
   true,
   "The base URL must use HTTP or HTTPS.",
+);
+assert.equal(
+  waitForExpiry && waitForPersistence,
+  false,
+  "Choose either --wait-for-expiry or --wait-for-persistence.",
 );
 
 const initialRooms = await getRooms();
@@ -107,20 +113,32 @@ const missingCount = await request(
 );
 assert.equal(missingCount.status, 410, await describe(missingCount));
 
-if (waitForExpiry) {
+if (waitForExpiry || waitForPersistence) {
   const expiryWaitMs = 145_000;
   await new Promise((resolve) => setTimeout(resolve, expiryWaitMs));
 
-  await waitForRoomListing(roomId, false);
+  await waitForRoomListing(roomId, waitForPersistence);
 
-  const expiredCount = await request(
+  const eventualCount = await request(
     `/api/rooms/${encodeURIComponent(roomId)}/participants`,
   );
-  assert.equal(expiredCount.status, 410, await describe(expiredCount));
+  assert.equal(
+    eventualCount.status,
+    waitForPersistence ? 200 : 410,
+    await describe(eventualCount),
+  );
+  if (waitForPersistence) {
+    assert.equal((await eventualCount.json()).participantCount, 0);
+  }
 
-  const expiredPage = await request(`/rooms/${encodeURIComponent(roomId)}`);
-  assert.equal(expiredPage.status, 200, await describe(expiredPage));
-  assert.match(await expiredPage.text(), /This room has expired\./);
+  const eventualPage = await request(`/rooms/${encodeURIComponent(roomId)}`);
+  assert.equal(eventualPage.status, 200, await describe(eventualPage));
+  const eventualPageBody = await eventualPage.text();
+  if (waitForPersistence) {
+    assert.doesNotMatch(eventualPageBody, /This room has expired\./);
+  } else {
+    assert.match(eventualPageBody, /This room has expired\./);
+  }
 }
 
 process.stdout.write(
@@ -130,6 +148,7 @@ process.stdout.write(
       concurrentAdmissions: admissionResponses.length,
       elapsedMs: Date.now() - startedAt,
       expiryVerified: waitForExpiry,
+      persistenceVerified: waitForPersistence,
       roomId,
     },
     null,

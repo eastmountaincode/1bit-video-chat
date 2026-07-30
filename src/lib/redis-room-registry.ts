@@ -16,6 +16,7 @@ import {
 } from "@/lib/room-directory";
 import {
   ROOM_EMPTY_GRACE_MS,
+  ROOM_EXPIRY_ENABLED,
   ROOM_HEARTBEAT_DEADLINE_MS,
   ROOM_PARTICIPANT_LEASE_MS,
 } from "@/lib/room-lifecycle";
@@ -33,16 +34,20 @@ const ROOM_PARTICIPANT_KEY_PREFIX = `${ROOM_KEY_TAG}:participants:`;
 const ROOM_CREATION_RATE_LIMIT = 5;
 const ROOM_CREATION_RATE_WINDOW_MS = 60 * 1_000;
 const MAX_EPHEMERAL_ROOMS = MAX_PUBLIC_ROOMS - 1;
+const ROOM_EXPIRY_ENABLED_LUA = ROOM_EXPIRY_ENABLED ? "true" : "false";
 
 const CREATE_ROOM_SCRIPT = `
 local time = redis.call("TIME")
 local now = (tonumber(time[1]) * 1000) + math.floor(tonumber(time[2]) / 1000)
-local expired = redis.call("ZRANGEBYSCORE", KEYS[1], "-inf", now)
-if #expired > 0 then
-  redis.call("HDEL", KEYS[2], unpack(expired))
-  redis.call("ZREM", KEYS[1], unpack(expired))
-  for _, id in ipairs(expired) do
-    redis.call("DEL", ARGV[7] .. id)
+local roomExpiryEnabled = ${ROOM_EXPIRY_ENABLED_LUA}
+if roomExpiryEnabled then
+  local expired = redis.call("ZRANGEBYSCORE", KEYS[1], "-inf", now)
+  if #expired > 0 then
+    redis.call("HDEL", KEYS[2], unpack(expired))
+    redis.call("ZREM", KEYS[1], unpack(expired))
+    for _, id in ipairs(expired) do
+      redis.call("DEL", ARGV[7] .. id)
+    end
   end
 end
 
@@ -70,12 +75,15 @@ return {1, now, deadline}
 const LIST_ROOMS_SCRIPT = `
 local time = redis.call("TIME")
 local now = (tonumber(time[1]) * 1000) + math.floor(tonumber(time[2]) / 1000)
-local expired = redis.call("ZRANGEBYSCORE", KEYS[1], "-inf", now)
-if #expired > 0 then
-  redis.call("HDEL", KEYS[2], unpack(expired))
-  redis.call("ZREM", KEYS[1], unpack(expired))
-  for _, id in ipairs(expired) do
-    redis.call("DEL", ARGV[2] .. id)
+local roomExpiryEnabled = ${ROOM_EXPIRY_ENABLED_LUA}
+if roomExpiryEnabled then
+  local expired = redis.call("ZRANGEBYSCORE", KEYS[1], "-inf", now)
+  if #expired > 0 then
+    redis.call("HDEL", KEYS[2], unpack(expired))
+    redis.call("ZREM", KEYS[1], unpack(expired))
+    for _, id in ipairs(expired) do
+      redis.call("DEL", ARGV[2] .. id)
+    end
   end
 end
 
@@ -96,8 +104,9 @@ return rooms
 const GET_ROOM_SCRIPT = `
 local time = redis.call("TIME")
 local now = (tonumber(time[1]) * 1000) + math.floor(tonumber(time[2]) / 1000)
+local roomExpiryEnabled = ${ROOM_EXPIRY_ENABLED_LUA}
 local deadline = redis.call("ZSCORE", KEYS[1], ARGV[1])
-if not deadline or tonumber(deadline) <= now then
+if not deadline or (roomExpiryEnabled and tonumber(deadline) <= now) then
   redis.call("ZREM", KEYS[1], ARGV[1])
   redis.call("HDEL", KEYS[2], ARGV[1])
   redis.call("DEL", KEYS[3])
@@ -127,9 +136,10 @@ return counts
 const GET_ROOM_PARTICIPANT_COUNT_SCRIPT = `
 local time = redis.call("TIME")
 local now = (tonumber(time[1]) * 1000) + math.floor(tonumber(time[2]) / 1000)
+local roomExpiryEnabled = ${ROOM_EXPIRY_ENABLED_LUA}
 if ARGV[2] ~= "1" then
   local deadline = redis.call("ZSCORE", KEYS[1], ARGV[1])
-  if not deadline or tonumber(deadline) <= now then
+  if not deadline or (roomExpiryEnabled and tonumber(deadline) <= now) then
     redis.call("ZREM", KEYS[1], ARGV[1])
     redis.call("HDEL", KEYS[2], ARGV[1])
     redis.call("DEL", KEYS[3])
@@ -149,9 +159,10 @@ return {1, redis.call("ZCARD", KEYS[3])}
 const ADMIT_ROOM_PARTICIPANT_SCRIPT = `
 local time = redis.call("TIME")
 local now = (tonumber(time[1]) * 1000) + math.floor(tonumber(time[2]) / 1000)
+local roomExpiryEnabled = ${ROOM_EXPIRY_ENABLED_LUA}
 if ARGV[6] ~= "1" then
   local deadline = redis.call("ZSCORE", KEYS[1], ARGV[1])
-  if not deadline or tonumber(deadline) <= now then
+  if not deadline or (roomExpiryEnabled and tonumber(deadline) <= now) then
     redis.call("ZREM", KEYS[1], ARGV[1])
     redis.call("HDEL", KEYS[2], ARGV[1])
     redis.call("DEL", KEYS[3])

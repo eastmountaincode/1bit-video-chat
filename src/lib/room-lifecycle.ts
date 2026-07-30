@@ -1,3 +1,7 @@
+// Flip this back to true to restore lazy deletion of rooms whose stored
+// deadlines have passed. Deadlines continue to be maintained while deletion
+// is disabled, so stale rooms become eligible again as soon as it is enabled.
+export const ROOM_EXPIRY_ENABLED = false;
 export const ROOM_EMPTY_GRACE_MS = 2 * 60 * 1_000;
 export const ROOM_HEARTBEAT_INTERVAL_MS = 20 * 1_000;
 export const ROOM_PARTICIPANT_LEASE_MS = 60 * 1_000;

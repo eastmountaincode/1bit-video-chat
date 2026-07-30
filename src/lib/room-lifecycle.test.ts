@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 
 import {
@@ -8,18 +9,58 @@ import {
   isRoomDeadlineActive,
   renewRoomDeadline,
   ROOM_EMPTY_GRACE_MS,
+  ROOM_EXPIRY_ENABLED,
   ROOM_HEARTBEAT_DEADLINE_MS,
   ROOM_HEARTBEAT_INTERVAL_MS,
   ROOM_PARTICIPANT_LEASE_MS,
 } from "./room-lifecycle.ts";
 
-test("keeps an unjoined room for exactly the two-minute grace period", () => {
+const roomRegistrySource = readFileSync(
+  new URL("./redis-room-registry.ts", import.meta.url),
+  "utf8",
+);
+
+test("keeps the two-minute deadline policy ready while deletion is disabled", () => {
   const createdAt = 10_000;
   const deadline = getCreatedRoomDeadline(createdAt);
 
+  assert.equal(ROOM_EXPIRY_ENABLED, false);
   assert.equal(deadline, createdAt + 120_000);
   assert.equal(isRoomDeadlineActive(deadline, deadline - 1), true);
   assert.equal(isRoomDeadlineActive(deadline, deadline), false);
+});
+
+test("guards every automatic room-deletion path with the one expiry switch", () => {
+  assert.match(
+    roomRegistrySource,
+    /const ROOM_EXPIRY_ENABLED_LUA = ROOM_EXPIRY_ENABLED \? "true" : "false";/,
+  );
+  assert.equal(
+    roomRegistrySource.match(
+      /local roomExpiryEnabled = \$\{ROOM_EXPIRY_ENABLED_LUA\}/g,
+    )?.length,
+    5,
+  );
+  assert.equal(
+    roomRegistrySource.match(/if roomExpiryEnabled then/g)?.length,
+    2,
+  );
+  assert.equal(
+    roomRegistrySource.match(
+      /\(roomExpiryEnabled and tonumber\(deadline\) <= now\)/g,
+    )?.length,
+    3,
+  );
+  assert.match(
+    roomRegistrySource,
+    /redis\.call\("ZADD", KEYS\[1\], "XX", now \+ tonumber\(ARGV\[3\]\), ARGV\[1\]\)/,
+  );
+  assert.equal(
+    roomRegistrySource.match(
+      /redis\.call\("ZREMRANGEBYSCORE", KEYS\[3\], "-inf", now\)/g,
+    )?.length,
+    3,
+  );
 });
 
 test("heartbeat timing leaves at least two minutes after an abrupt close", () => {
@@ -45,7 +86,7 @@ test("a stale heartbeat cannot shorten a newer room deadline", () => {
   assert.equal(delayedOlderRequest, first);
 });
 
-test("an expired room cannot be revived by a late heartbeat", () => {
+test("the retained deadline policy rejects a late heartbeat", () => {
   assert.equal(renewRoomDeadline(100_000, 100_000), null);
   assert.equal(renewRoomDeadline(99_999, 100_000), null);
 });

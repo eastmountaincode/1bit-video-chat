@@ -19,7 +19,7 @@ The shared pattern editor embeds
 - Each viewer can target only their own card with `[data-room-part="video-card"][data-video-side="own"]`.
 - The server-backed lobby lists public rooms and lets anyone create one.
 - Every room admits at most 20 active participants, with atomic server-side admission and live counts in the directory and camera lobby.
-- User-created rooms expire after their last participant leaves, with a two-minute empty-room grace period; Main room remains permanent.
+- Automatic empty-room deletion is currently disabled. The two-minute expiry policy and deadline bookkeeping remain in place behind `ROOM_EXPIRY_ENABLED`, so they can be restored with a one-line switch; Main room remains permanent.
 - Every room has its own isolated video presence, chat, and shared style state.
 - The original shared state remains available in the default Main room.
 - Entering or leaving a room reloads the document so no prior room transport can leak across the boundary.
@@ -45,8 +45,12 @@ reuses one place, and checks missing-room handling:
 npm run test:rooms:live
 ```
 
-Add `-- --wait-for-expiry` to also wait for the room to expire and verify that
-its list entry and URL stop working.
+With automatic deletion disabled, add `-- --wait-for-persistence` to verify
+that an empty room remains available after the two-minute deadline. If
+`ROOM_EXPIRY_ENABLED` is restored to `true`, use `-- --wait-for-expiry`
+instead to verify that the room's list entry and URL stop working.
+While deletion is disabled, run this smoke test only with an isolated
+`TELEPATHY_ROOM_REGISTRY_NAMESPACE`, because its temporary room will persist.
 
 In development, `/benchmark?participants=20&fps=15&duration=10`
 runs the real tile renderer with mock participants and reports long tasks,
