@@ -137,6 +137,10 @@ export type StrudelFrameEvent =
       type: "ready";
     }
   | {
+      source: "telepathy-strudel";
+      type: "reset-request";
+    }
+  | {
       error?: string;
       ok: boolean;
       revision: string;
@@ -224,7 +228,13 @@ export function isStrudelFrameEvent(
   const event = value as Partial<StrudelFrameEvent>;
 
   if (event.source !== "telepathy-strudel") return false;
-  if (event.type === "ready" || event.type === "stopped") return true;
+  if (
+    event.type === "ready" ||
+    event.type === "reset-request" ||
+    event.type === "stopped"
+  ) {
+    return true;
+  }
   if (event.type === "stop-request") {
     return isRuntimeCommandId(event.commandId);
   }

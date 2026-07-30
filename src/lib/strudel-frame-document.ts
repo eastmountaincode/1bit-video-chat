@@ -57,6 +57,7 @@ export const STRUDEL_FRAME_DOCUMENT = `<!doctype html>
       (() => {
         const SOURCE = "telepathy-strudel";
         const AUDIO_RESUME_TIMEOUT_MS = 750;
+        const EVALUATION_RESET_TIMEOUT_MS = 2000;
         const MAX_CODE_LENGTH = 10000;
         const SAMPLE_CATALOGS = ${JSON.stringify(STRUDEL_SAMPLE_CATALOGS)};
         const runButton = document.querySelector("#run");
@@ -68,6 +69,7 @@ export const STRUDEL_FRAME_DOCUMENT = `<!doctype html>
         let evaluationGeneration = 0;
         let activeEvaluationGeneration = 0;
         let evaluationError = null;
+        let evaluationResetTimer = null;
         let initialized = false;
         let lastAppliedCommandKey = "";
         let latestDesiredEvaluation = null;
@@ -76,6 +78,10 @@ export const STRUDEL_FRAME_DOCUMENT = `<!doctype html>
         let sampleCatalogsPromise = null;
         let stagedCode = "";
         let stagedRevision = "";
+        let activePattern = null;
+        let requestedTransitionBoundary = null;
+        let strudelRuntime = null;
+        let transitionBoundary = null;
 
         function send(message) {
           window.parent.postMessage({ source: SOURCE, ...message }, "*");
@@ -108,7 +114,9 @@ export const STRUDEL_FRAME_DOCUMENT = `<!doctype html>
           typeof api.getAudioContext !== "function" ||
           typeof api.evaluate !== "function" ||
           typeof api.hush !== "function" ||
-          typeof api.samples !== "function"
+          typeof api.samples !== "function" ||
+          typeof api.Pattern !== "function" ||
+          typeof api.TimeSpan !== "function"
         ) {
           send({
             error: "Strudel could not load.",
@@ -133,13 +141,127 @@ export const STRUDEL_FRAME_DOCUMENT = `<!doctype html>
           return sampleCatalogsPromise;
         }
 
-        const initialization = Promise.resolve().then(() =>
-          api.initStrudel({
-            onEvalError(error) {
-              evaluationError = errorMessage(error);
-            },
-          }),
-        );
+        function transitionAt(previousPattern, nextPattern, boundary) {
+          return new api.Pattern((state) => {
+            const { span } = state;
+            if (span.begin.gte(boundary)) {
+              return nextPattern.query(state);
+            }
+            if (span.end.lte(boundary)) {
+              return previousPattern.query(state);
+            }
+            return [
+              ...previousPattern.query(
+                state.setSpan(
+                  new api.TimeSpan(span.begin, boundary),
+                ),
+              ),
+              ...nextPattern.query(
+                state.setSpan(
+                  new api.TimeSpan(boundary, span.end),
+                ),
+              ),
+            ];
+          });
+        }
+
+        function nextTransitionBoundary(scheduler) {
+          const currentCycle =
+            typeof scheduler?.now === "function"
+              ? Number(scheduler.now())
+              : Number.NaN;
+          if (!Number.isFinite(currentCycle)) return null;
+          const nextAfterCurrentCycle =
+            Math.floor(currentCycle) + 1;
+          const queriedThrough = Number(scheduler.lastEnd);
+          return Math.max(
+            nextAfterCurrentCycle,
+            Number.isFinite(queriedThrough)
+              ? Math.ceil(queriedThrough)
+              : nextAfterCurrentCycle,
+          );
+        }
+
+        function editPattern(nextPattern) {
+          const scheduler = strudelRuntime?.scheduler;
+          const currentPattern = scheduler?.pattern;
+          const currentCycle =
+            typeof scheduler?.now === "function"
+              ? Number(scheduler.now())
+              : Number.NaN;
+          if (
+            activeEvaluationGeneration !== evaluationGeneration
+          ) {
+            requestedTransitionBoundary = null;
+            return nextPattern;
+          }
+          if (
+            !running ||
+            !activePattern ||
+            !scheduler ||
+            !currentPattern ||
+            !Number.isFinite(currentCycle)
+          ) {
+            activePattern = nextPattern;
+            requestedTransitionBoundary = null;
+            transitionBoundary = null;
+            return nextPattern;
+          }
+
+          const currentSafeBoundary =
+            nextTransitionBoundary(scheduler);
+          const boundary =
+            requestedTransitionBoundary === null
+              ? currentSafeBoundary
+              : currentSafeBoundary === null
+                ? requestedTransitionBoundary
+                : Math.max(
+                    requestedTransitionBoundary,
+                    currentSafeBoundary,
+                  );
+          requestedTransitionBoundary = null;
+          if (!Number.isFinite(boundary)) {
+            activePattern = nextPattern;
+            transitionBoundary = null;
+            return nextPattern;
+          }
+          const previousPattern =
+            transitionBoundary !== null &&
+            currentCycle >= transitionBoundary
+              ? activePattern
+              : currentPattern;
+          const transitionPattern = transitionAt(
+            previousPattern,
+            nextPattern,
+            boundary,
+          );
+
+          activePattern = nextPattern;
+          transitionBoundary = boundary;
+          return transitionPattern;
+        }
+
+        const initialization = Promise.resolve()
+          .then(() =>
+            api.initStrudel({
+              editPattern,
+              onEvalError(error) {
+                evaluationError = errorMessage(error);
+              },
+            }),
+          )
+          .then((runtime) => {
+            if (
+              !runtime ||
+              !runtime.scheduler ||
+              typeof runtime.scheduler.now !== "function" ||
+              typeof runtime.start !== "function"
+            ) {
+              throw new Error("Strudel scheduler could not load.");
+            }
+            strudelRuntime = runtime;
+            return runtime;
+          });
 
         initialization.then(
           () => {
@@ -203,12 +325,36 @@ export const STRUDEL_FRAME_DOCUMENT = `<!doctype html>
           }
         }
 
-        function queueEvaluation(request) {
-          if (evaluating) {
-            pendingEvaluation = request;
-            return;
-          }
+        function drainEvaluationQueue() {
+          if (evaluating || !pendingEvaluation) return;
+          const request = pendingEvaluation;
+          pendingEvaluation = null;
           void evaluatePattern(request);
+        }
+
+        function queueEvaluation(request) {
+          pendingEvaluation = request;
+          drainEvaluationQueue();
+        }
+
+        function clearEvaluationResetTimer() {
+          if (evaluationResetTimer === null) return;
+          clearTimeout(evaluationResetTimer);
+          evaluationResetTimer = null;
+        }
+
+        function scheduleEvaluationReset() {
+          clearEvaluationResetTimer();
+          if (!evaluating) return;
+          evaluationResetTimer = setTimeout(() => {
+            evaluationResetTimer = null;
+            if (
+              evaluating &&
+              activeEvaluationGeneration !== evaluationGeneration
+            ) {
+              send({ type: "reset-request" });
+            }
+          }, EVALUATION_RESET_TIMEOUT_MS);
         }
 
         async function evaluatePattern(request) {
@@ -225,6 +371,7 @@ export const STRUDEL_FRAME_DOCUMENT = `<!doctype html>
           let restarted = false;
           evaluating = true;
           evaluationError = null;
+          requestedTransitionBoundary = null;
           updateButtons();
 
           try {
@@ -235,21 +382,36 @@ export const STRUDEL_FRAME_DOCUMENT = `<!doctype html>
             if (restart) {
               api.hush();
               restarted = true;
+              running = false;
+              activePattern = null;
+              transitionBoundary = null;
             }
-            await api.evaluate(code);
+            if (wasRunning && !restart) {
+              requestedTransitionBoundary =
+                nextTransitionBoundary(
+                  strudelRuntime.scheduler,
+                );
+            }
+            const evaluatedPattern = await api.evaluate(code, false);
             if (generation !== evaluationGeneration) {
-              api.hush();
-              if (desiredEnabled && latestDesiredEvaluation) {
-                queueEvaluation({
-                  ...latestDesiredEvaluation,
-                  preparedAudio: prepareAudio(),
-                  restart: false,
-                });
-              }
+              activePattern = null;
+              requestedTransitionBoundary = null;
+              transitionBoundary = null;
               return;
             }
-            if (evaluationError) {
-              throw new Error(evaluationError);
+            if (evaluationError || !evaluatedPattern) {
+              throw new Error(
+                evaluationError || "Strudel pattern could not run.",
+              );
+            }
+            if (!running) {
+              await strudelRuntime.start();
+              if (generation !== evaluationGeneration) {
+                api.hush();
+                activePattern = null;
+                transitionBoundary = null;
+                return;
+              }
             }
             running = true;
             send({ ok: true, revision, type: "result" });
@@ -263,13 +425,13 @@ export const STRUDEL_FRAME_DOCUMENT = `<!doctype html>
               type: "result",
             });
           } finally {
+            requestedTransitionBoundary = null;
             if (activeEvaluationGeneration !== generation) return;
+            clearEvaluationResetTimer();
             activeEvaluationGeneration = 0;
             evaluating = false;
             updateButtons();
-            const nextEvaluation = pendingEvaluation;
-            pendingEvaluation = null;
-            if (nextEvaluation) queueEvaluation(nextEvaluation);
+            drainEvaluationQueue();
           }
         }
 
@@ -277,10 +439,12 @@ export const STRUDEL_FRAME_DOCUMENT = `<!doctype html>
           latestDesiredEvaluation = null;
           pendingEvaluation = null;
           evaluationGeneration += 1;
-          activeEvaluationGeneration = 0;
-          evaluating = false;
           api.hush();
           running = false;
+          activePattern = null;
+          requestedTransitionBoundary = null;
+          transitionBoundary = null;
+          scheduleEvaluationReset();
           updateButtons();
           send({ type: "stopped" });
         }
@@ -359,23 +523,36 @@ export const STRUDEL_FRAME_DOCUMENT = `<!doctype html>
 
         runButton.addEventListener("click", () => {
           if (runButton.disabled) return;
+          const isLocalRetry =
+            desiredEnabled &&
+            !running &&
+            latestDesiredEvaluation &&
+            stagedCode === latestDesiredEvaluation.code &&
+            stagedRevision === latestDesiredEvaluation.revision;
           const commandId = crypto.randomUUID();
+          const restart = !running;
           desiredEnabled = true;
-          lastAppliedCommandKey = "update:" + commandId;
           updateButtons();
           latestDesiredEvaluation = {
-            code: stagedCode,
+            code: isLocalRetry
+              ? latestDesiredEvaluation.code
+              : stagedCode,
             preparedAudio: prepareAudio(),
-            restart: true,
-            revision: stagedRevision,
+            restart,
+            revision: isLocalRetry
+              ? latestDesiredEvaluation.revision
+              : stagedRevision,
           };
           queueEvaluation(latestDesiredEvaluation);
-          send({
-            code: stagedCode,
-            commandId,
-            revision: stagedRevision,
-            type: "run-request",
-          });
+          if (!isLocalRetry) {
+            lastAppliedCommandKey = "update:" + commandId;
+            send({
+              code: stagedCode,
+              commandId,
+              revision: stagedRevision,
+              type: "run-request",
+            });
+          }
         });
 
         stopButton.addEventListener("click", () => {

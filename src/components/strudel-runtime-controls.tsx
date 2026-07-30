@@ -28,6 +28,7 @@ export function StrudelRuntimeControls({
   runtime,
 }: StrudelRuntimeControlsProps) {
   const frameRef = useRef<HTMLIFrameElement>(null);
+  const [frameGeneration, setFrameGeneration] = useState(0);
   const [ready, setReady] = useState(false);
   const revision = useMemo(
     () => createStrudelRevision(code),
@@ -48,6 +49,9 @@ export function StrudelRuntimeControls({
 
       if (event.data.type === "ready") {
         setReady(true);
+      } else if (event.data.type === "reset-request") {
+        setReady(false);
+        setFrameGeneration((current) => current + 1);
       } else if (event.data.type === "run-request") {
         onRun(event.data.code, event.data.commandId);
       } else if (event.data.type === "stop-request") {
@@ -102,6 +106,7 @@ export function StrudelRuntimeControls({
     <iframe
       allow="autoplay"
       className="strudel-controls-frame"
+      key={frameGeneration}
       ref={frameRef}
       referrerPolicy="no-referrer"
       sandbox="allow-scripts"

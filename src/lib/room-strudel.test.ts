@@ -213,6 +213,13 @@ test("validates the Strudel frame message boundary", () => {
   );
   assert.equal(
     isStrudelFrameEvent({
+      source: "telepathy-strudel",
+      type: "reset-request",
+    }),
+    true,
+  );
+  assert.equal(
+    isStrudelFrameEvent({
       error: "bad pattern",
       ok: false,
       revision: "revision",
@@ -246,6 +253,11 @@ test("keeps Strudel evaluation in a gesture-owning isolated frame", () => {
   assert.match(strudelControls, /sandbox="allow-scripts"/);
   assert.doesNotMatch(strudelControls, /allow-same-origin/);
   assert.match(
+    strudelControls,
+    /event\.data\.type === "reset-request"/,
+  );
+  assert.match(strudelControls, /key=\{frameGeneration\}/);
+  assert.match(
     STRUDEL_FRAME_DOCUMENT,
     /<script src="\/strudel-web-1\.3\.0\/index\.js"><\/script>/,
   );
@@ -264,7 +276,11 @@ test("keeps Strudel evaluation in a gesture-owning isolated frame", () => {
   assert.match(STRUDEL_FRAME_DOCUMENT, /api\.getAudioContext\(\)/);
   assert.match(STRUDEL_FRAME_DOCUMENT, /audioContext\.resume\(\)/);
   assert.match(STRUDEL_FRAME_DOCUMENT, /await api\.initAudio\(\)/);
-  assert.match(STRUDEL_FRAME_DOCUMENT, /await api\.evaluate\(code\)/);
+  assert.match(
+    STRUDEL_FRAME_DOCUMENT,
+    /await api\.evaluate\(code, false\)/,
+  );
+  assert.match(STRUDEL_FRAME_DOCUMENT, /await strudelRuntime\.start\(\)/);
   assert.match(STRUDEL_FRAME_DOCUMENT, /await loadSampleCatalogs\(\)/);
   assert.match(
     STRUDEL_FRAME_DOCUMENT,
@@ -276,7 +292,7 @@ test("keeps Strudel evaluation in a gesture-owning isolated frame", () => {
   );
   assert.match(
     STRUDEL_FRAME_DOCUMENT,
-    /if \(nextEvaluation\) queueEvaluation\(nextEvaluation\);/,
+    /drainEvaluationQueue\(\);/,
   );
   assert.match(
     STRUDEL_FRAME_DOCUMENT,
@@ -284,7 +300,19 @@ test("keeps Strudel evaluation in a gesture-owning isolated frame", () => {
   );
   assert.match(
     STRUDEL_FRAME_DOCUMENT,
-    /restart: true/,
+    /const restart = !running;/,
+  );
+  assert.match(
+    STRUDEL_FRAME_DOCUMENT,
+    /const transitionPattern = transitionAt\(/,
+  );
+  assert.match(
+    STRUDEL_FRAME_DOCUMENT,
+    /return new api\.Pattern\(\(state\) =>/,
+  );
+  assert.match(
+    STRUDEL_FRAME_DOCUMENT,
+    /new api\.TimeSpan\(boundary, span\.end\)/,
   );
   assert.match(
     STRUDEL_FRAME_DOCUMENT,
@@ -363,7 +391,7 @@ test("loads official sample catalogs lazily and retries catalog failures", () =>
     "await loadSampleCatalogs()",
   );
   const evaluationIndex = STRUDEL_FRAME_DOCUMENT.indexOf(
-    "await api.evaluate(code)",
+    "await api.evaluate(code, false)",
   );
   assert.ok(audioIndex >= 0);
   assert.ok(audioIndex < catalogsIndex);
