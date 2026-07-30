@@ -6,9 +6,29 @@ import {
 } from "./collaborative-code.ts";
 
 export const MAX_STRUDEL_CODE_LENGTH = 10_000;
+export const MAX_STRUDEL_RUNTIME_COMMAND_ID_LENGTH = 128;
+export const MAX_STRUDEL_RUNTIME_REQUESTED_BY_LENGTH = 24;
 
 export const DEFAULT_STRUDEL_CODE =
   'note("<c3 eb3 g3 bb3>").s("sine").slow(2)';
+
+export interface RoomStrudelRuntimeSnapshot {
+  commandId: string;
+  enabled: boolean;
+  code: string;
+  requestedAt: number;
+  requestedBy: string;
+}
+
+export interface RoomStrudelRuntimeData {
+  current: RoomStrudelRuntimeSnapshot | null;
+  version: 1;
+}
+
+export const DEFAULT_ROOM_STRUDEL_RUNTIME: RoomStrudelRuntimeData = {
+  current: null,
+  version: 1,
+};
 
 export type CollaborativeRoomStrudelData = CollaborativeCodeData;
 
@@ -22,19 +42,91 @@ export const DEFAULT_COLLABORATIVE_ROOM_STRUDEL: CollaborativeRoomStrudelData =
     version: 1,
   };
 
-interface StrudelCodeFrameCommand {
+export function createRoomStrudelRuntimeSnapshot({
+  commandId,
+  enabled,
+  code,
+  requestedAt,
+  requestedBy,
+}: RoomStrudelRuntimeSnapshot): RoomStrudelRuntimeSnapshot {
+  return {
+    commandId: commandId.slice(0, MAX_STRUDEL_RUNTIME_COMMAND_ID_LENGTH),
+    enabled,
+    code: code.slice(0, MAX_STRUDEL_CODE_LENGTH),
+    requestedAt:
+      Number.isFinite(requestedAt) && requestedAt >= 0 ? requestedAt : 0,
+    requestedBy: requestedBy.slice(
+      0,
+      MAX_STRUDEL_RUNTIME_REQUESTED_BY_LENGTH,
+    ),
+  };
+}
+
+export function normalizeRoomStrudelRuntimeData(
+  value: unknown,
+): RoomStrudelRuntimeData {
+  if (!isRecord(value) || value.version !== 1) {
+    return DEFAULT_ROOM_STRUDEL_RUNTIME;
+  }
+
+  const current = value.current;
+  if (current === null) return DEFAULT_ROOM_STRUDEL_RUNTIME;
+  if (
+    !isRecord(current) ||
+    typeof current.commandId !== "string" ||
+    current.commandId.trim().length === 0 ||
+    typeof current.enabled !== "boolean" ||
+    typeof current.code !== "string" ||
+    typeof current.requestedAt !== "number" ||
+    !Number.isFinite(current.requestedAt) ||
+    current.requestedAt < 0 ||
+    typeof current.requestedBy !== "string"
+  ) {
+    return DEFAULT_ROOM_STRUDEL_RUNTIME;
+  }
+
+  const snapshot = createRoomStrudelRuntimeSnapshot({
+    commandId: current.commandId,
+    enabled: current.enabled,
+    code: current.code,
+    requestedAt: current.requestedAt,
+    requestedBy: current.requestedBy,
+  });
+  if (
+    snapshot.commandId.trim().length === 0 ||
+    (snapshot.enabled && snapshot.code.trim().length === 0)
+  ) {
+    return DEFAULT_ROOM_STRUDEL_RUNTIME;
+  }
+
+  return {
+    current: snapshot,
+    version: 1,
+  };
+}
+
+interface StrudelStageFrameCommand {
   canRun: boolean;
   code: string;
   disabled: boolean;
   revision: string;
   source: "telepathy-strudel";
+  type: "stage";
+}
+
+interface StrudelUpdateFrameCommand {
+  code: string;
+  commandId: string;
+  revision: string;
+  source: "telepathy-strudel";
+  type: "update";
 }
 
 export type StrudelFrameCommand =
-  | (StrudelCodeFrameCommand & {
-      type: "stage" | "update";
-    })
+  | StrudelStageFrameCommand
+  | StrudelUpdateFrameCommand
   | {
+      commandId: string;
       source: "telepathy-strudel";
       type: "stop";
     };
@@ -54,6 +146,18 @@ export type StrudelFrameEvent =
   | {
       source: "telepathy-strudel";
       type: "stopped";
+    }
+  | {
+      code: string;
+      commandId: string;
+      revision: string;
+      source: "telepathy-strudel";
+      type: "run-request";
+    }
+  | {
+      commandId: string;
+      source: "telepathy-strudel";
+      type: "stop-request";
     };
 
 export function createRoomStrudelDocument(
@@ -91,10 +195,18 @@ export function isStrudelFrameCommand(
   const command = value as Partial<StrudelFrameCommand>;
 
   if (command.source !== "telepathy-strudel") return false;
-  if (command.type === "stop") return true;
-  if (command.type !== "stage" && command.type !== "update") {
-    return false;
+  if (command.type === "stop") {
+    return isRuntimeCommandId(command.commandId);
   }
+  if (command.type === "update") {
+    return (
+      typeof command.code === "string" &&
+      command.code.length <= MAX_STRUDEL_CODE_LENGTH &&
+      typeof command.revision === "string" &&
+      isRuntimeCommandId(command.commandId)
+    );
+  }
+  if (command.type !== "stage") return false;
 
   return (
     typeof command.code === "string" &&
@@ -113,6 +225,17 @@ export function isStrudelFrameEvent(
 
   if (event.source !== "telepathy-strudel") return false;
   if (event.type === "ready" || event.type === "stopped") return true;
+  if (event.type === "stop-request") {
+    return isRuntimeCommandId(event.commandId);
+  }
+  if (event.type === "run-request") {
+    return (
+      typeof event.code === "string" &&
+      event.code.length <= MAX_STRUDEL_CODE_LENGTH &&
+      typeof event.revision === "string" &&
+      isRuntimeCommandId(event.commandId)
+    );
+  }
   if (event.type !== "result") return false;
 
   return (
@@ -131,4 +254,16 @@ function hashStrudelCode(code: string) {
   }
 
   return (hash >>> 0).toString(36);
+}
+
+function isRuntimeCommandId(value: unknown): value is string {
+  return (
+    typeof value === "string" &&
+    value.trim().length > 0 &&
+    value.length <= MAX_STRUDEL_RUNTIME_COMMAND_ID_LENGTH
+  );
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
 }

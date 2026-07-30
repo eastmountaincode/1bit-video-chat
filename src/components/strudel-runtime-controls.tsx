@@ -1,17 +1,11 @@
 "use client";
 
-import {
-  useEffect,
-  useImperativeHandle,
-  useMemo,
-  useRef,
-  useState,
-  type RefObject,
-} from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import {
   createStrudelRevision,
   isStrudelFrameEvent,
+  type RoomStrudelRuntimeSnapshot,
   type StrudelFrameCommand,
 } from "@/lib/room-strudel";
 import { STRUDEL_FRAME_DOCUMENT } from "@/lib/strudel-frame-document";
@@ -19,73 +13,29 @@ import { STRUDEL_FRAME_DOCUMENT } from "@/lib/strudel-frame-document";
 interface StrudelRuntimeControlsProps {
   canRun: boolean;
   code: string;
-  controlRef: RefObject<StrudelRuntimeControlsHandle | null>;
   disabled: boolean;
-}
-
-export interface StrudelRuntimeControlsHandle {
-  stop: () => void;
-  update: (code: string) => void;
+  onRun: (code: string, commandId?: string) => void;
+  onStop: (commandId?: string) => void;
+  runtime: RoomStrudelRuntimeSnapshot | null;
 }
 
 export function StrudelRuntimeControls({
   canRun,
   code,
-  controlRef,
   disabled,
+  onRun,
+  onStop,
+  runtime,
 }: StrudelRuntimeControlsProps) {
   const frameRef = useRef<HTMLIFrameElement>(null);
-  const latestControlsRef = useRef({ canRun, disabled });
-  const pendingUpdateRef = useRef<StrudelFrameCommand | null>(null);
-  const requestedRevisionRef = useRef<string | null>(null);
-  const readyRef = useRef(false);
   const [ready, setReady] = useState(false);
   const revision = useMemo(
     () => createStrudelRevision(code),
     [code],
   );
-
-  useImperativeHandle(
-    controlRef,
-    () => ({
-      update(nextCode: string) {
-        if (disabled || !canRun || !nextCode.trim()) return;
-
-        const command: StrudelFrameCommand = {
-          canRun,
-          code: nextCode,
-          disabled,
-          revision: createStrudelRevision(nextCode),
-          source: "telepathy-strudel",
-          type: "update",
-        };
-        requestedRevisionRef.current = command.revision;
-        if (readyRef.current) {
-          frameRef.current?.contentWindow?.postMessage(command, "*");
-        } else {
-          pendingUpdateRef.current = command;
-        }
-      },
-      stop() {
-        pendingUpdateRef.current = null;
-        requestedRevisionRef.current = null;
-        const command: StrudelFrameCommand = {
-          source: "telepathy-strudel",
-          type: "stop",
-        };
-        frameRef.current?.contentWindow?.postMessage(command, "*");
-      },
-    }),
-    [canRun, disabled],
-  );
-
-  useEffect(() => {
-    latestControlsRef.current = { canRun, disabled };
-    if (!canRun || disabled) {
-      pendingUpdateRef.current = null;
-      requestedRevisionRef.current = null;
-    }
-  }, [canRun, disabled]);
+  const runtimeCode = runtime?.code ?? "";
+  const runtimeCommandId = runtime?.commandId ?? "";
+  const runtimeEnabled = runtime?.enabled ?? false;
 
   useEffect(() => {
     function handleFrameMessage(event: MessageEvent) {
@@ -97,43 +47,17 @@ export function StrudelRuntimeControls({
       }
 
       if (event.data.type === "ready") {
-        readyRef.current = true;
         setReady(true);
-        const pendingUpdate = pendingUpdateRef.current;
-        pendingUpdateRef.current = null;
-        const latestControls = latestControlsRef.current;
-        if (
-          pendingUpdate &&
-          latestControls.canRun &&
-          !latestControls.disabled
-        ) {
-          frameRef.current?.contentWindow?.postMessage(
-            pendingUpdate,
-            "*",
-          );
-        } else {
-          requestedRevisionRef.current = null;
-        }
-        return;
+      } else if (event.data.type === "run-request") {
+        onRun(event.data.code, event.data.commandId);
+      } else if (event.data.type === "stop-request") {
+        onStop(event.data.commandId);
       }
-      if (event.data.type === "stopped") {
-        requestedRevisionRef.current = null;
-        return;
-      }
-      if (
-        event.data.revision !== revision &&
-        event.data.revision !== requestedRevisionRef.current &&
-        !(event.data.revision === "" && !event.data.ok)
-      ) {
-        return;
-      }
-
-      requestedRevisionRef.current = null;
     }
 
     window.addEventListener("message", handleFrameMessage);
     return () => window.removeEventListener("message", handleFrameMessage);
-  }, [revision]);
+  }, [onRun, onStop]);
 
   useEffect(() => {
     if (!ready) return;
@@ -148,6 +72,31 @@ export function StrudelRuntimeControls({
     };
     frameRef.current?.contentWindow?.postMessage(command, "*");
   }, [canRun, code, disabled, ready, revision]);
+
+  useEffect(() => {
+    if (!ready || disabled || !runtimeCommandId) return;
+
+    const command: StrudelFrameCommand = runtimeEnabled
+      ? {
+          code: runtimeCode,
+          commandId: runtimeCommandId,
+          revision: createStrudelRevision(runtimeCode),
+          source: "telepathy-strudel",
+          type: "update",
+        }
+      : {
+          commandId: runtimeCommandId,
+          source: "telepathy-strudel",
+          type: "stop",
+        };
+    frameRef.current?.contentWindow?.postMessage(command, "*");
+  }, [
+    disabled,
+    ready,
+    runtimeCode,
+    runtimeCommandId,
+    runtimeEnabled,
+  ]);
 
   return (
     <iframe

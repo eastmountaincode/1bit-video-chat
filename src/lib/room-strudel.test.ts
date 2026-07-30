@@ -166,9 +166,8 @@ test("creates stable Strudel revisions that change with the score", () => {
 test("validates the Strudel frame message boundary", () => {
   assert.equal(
     isStrudelFrameCommand({
-      canRun: true,
       code: 'note("d3")',
-      disabled: false,
+      commandId: "update-command",
       revision: "update-revision",
       source: "telepathy-strudel",
       type: "update",
@@ -177,6 +176,7 @@ test("validates the Strudel frame message boundary", () => {
   );
   assert.equal(
     isStrudelFrameCommand({
+      commandId: "stop-command",
       source: "telepathy-strudel",
       type: "stop",
     }),
@@ -221,6 +221,24 @@ test("validates the Strudel frame message boundary", () => {
     }),
     true,
   );
+  assert.equal(
+    isStrudelFrameEvent({
+      code: 'note("d3")',
+      commandId: "run-request",
+      revision: "revision",
+      source: "telepathy-strudel",
+      type: "run-request",
+    }),
+    true,
+  );
+  assert.equal(
+    isStrudelFrameEvent({
+      commandId: "stop-request",
+      source: "telepathy-strudel",
+      type: "stop-request",
+    }),
+    true,
+  );
 });
 
 test("keeps Strudel evaluation in a gesture-owning isolated frame", () => {
@@ -237,12 +255,14 @@ test("keeps Strudel evaluation in a gesture-owning isolated frame", () => {
   );
   assert.match(
     STRUDEL_FRAME_DOCUMENT,
-    /command\.type === "update"/,
+    /command\.type !== "update"/,
   );
   assert.match(
     STRUDEL_FRAME_DOCUMENT,
     /command\.type === "stop"/,
   );
+  assert.match(STRUDEL_FRAME_DOCUMENT, /api\.getAudioContext\(\)/);
+  assert.match(STRUDEL_FRAME_DOCUMENT, /audioContext\.resume\(\)/);
   assert.match(STRUDEL_FRAME_DOCUMENT, /await api\.initAudio\(\)/);
   assert.match(STRUDEL_FRAME_DOCUMENT, /await api\.evaluate\(code\)/);
   assert.match(STRUDEL_FRAME_DOCUMENT, /await loadSampleCatalogs\(\)/);
@@ -252,11 +272,27 @@ test("keeps Strudel evaluation in a gesture-owning isolated frame", () => {
   );
   assert.match(
     STRUDEL_FRAME_DOCUMENT,
-    /evaluatePattern\(\s*command\.code,\s*command\.revision,\s*false,\s*\)/,
+    /pendingEvaluation = request;/,
   );
   assert.match(
     STRUDEL_FRAME_DOCUMENT,
-    /evaluatePattern\(stagedCode, stagedRevision, true\)/,
+    /if \(nextEvaluation\) queueEvaluation\(nextEvaluation\);/,
+  );
+  assert.match(
+    STRUDEL_FRAME_DOCUMENT,
+    /restart: false/,
+  );
+  assert.match(
+    STRUDEL_FRAME_DOCUMENT,
+    /restart: true/,
+  );
+  assert.match(
+    STRUDEL_FRAME_DOCUMENT,
+    /type: "run-request"/,
+  );
+  assert.match(
+    STRUDEL_FRAME_DOCUMENT,
+    /type: "stop-request"/,
   );
   assert.match(
     STRUDEL_FRAME_DOCUMENT,
@@ -279,7 +315,7 @@ test("uses minimal controls that become update and stop while running", () => {
   );
   assert.match(
     STRUDEL_FRAME_DOCUMENT,
-    /runButton\.textContent = running \? "update" : "run";/,
+    /runButton\.textContent = desiredEnabled \? "update" : "run";/,
   );
   assert.doesNotMatch(
     STRUDEL_FRAME_DOCUMENT,
@@ -394,21 +430,21 @@ test("serves sample metadata with stable cross-origin cache headers", async () =
   assert.equal(manifest.metal[1], "metal/001_1.wav");
 });
 
-test("backs Strudel with the shared editor and no runtime messages", () => {
+test("backs Strudel with separate shared draft and runtime snapshots", () => {
   assert.match(strudelPanel, /room-strudel-code:v1/);
-  assert.match(strudelPanel, /onRunShortcut:/);
-  assert.match(strudelPanel, /onStopShortcut:/);
+  assert.match(strudelPanel, /room-strudel-runtime:v1/);
+  assert.match(strudelPanel, /onRunShortcut:\s*runStrudel/);
+  assert.match(strudelPanel, /onStopShortcut:\s*stopStrudel/);
   assert.match(
     strudelPanel,
     /aria-keyshortcuts="Control\+Enter Meta\+Enter Control\+\. Meta\+\."/,
   );
-  assert.match(strudelPanel, /controlRef=\{runtimeControlsRef\}/);
-  assert.match(
-    strudelPanel,
-    /runtimeControlsRef\.current\?\.update\(code\)/,
-  );
-  assert.match(strudelControls, /pendingUpdateRef/);
-  assert.match(strudelControls, /readyRef\.current/);
+  assert.match(strudelPanel, /draft\.current = createRoomStrudelRuntimeSnapshot/);
+  assert.match(strudelPanel, /runtime=\{roomRuntime\}/);
+  assert.match(strudelControls, /runtimeCommandId/);
+  assert.match(strudelControls, /type: "update"/);
+  assert.match(strudelControls, /type: "stop"/);
+  assert.doesNotMatch(strudelPanel, /runtimeEnabled/);
   assert.match(collaborativeCodeEditor, /mergeTextEntrySplices/);
   assert.match(collaborativeCodeEditor, /getCodeEditorShortcut/);
   assert.doesNotMatch(strudelPanel, /strudel loading/i);

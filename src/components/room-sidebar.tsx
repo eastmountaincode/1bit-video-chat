@@ -1,7 +1,5 @@
 "use client";
 
-import { useState } from "react";
-
 import { ChatPanel } from "@/components/chat-panel";
 import { HelperPanel } from "@/components/helper-panel";
 import { HydraPanel } from "@/components/hydra-panel";
@@ -63,15 +61,8 @@ export function RoomSidebar({
   videoConnectionStatus,
 }: RoomSidebarProps) {
   const isMobile = useMobileLayout();
-  const [strudelRuntimeEnabled, setStrudelRuntimeEnabled] = useState(
-    activePanel === "strudel",
-  );
 
   function selectPanel(panel: SidebarPanel) {
-    if (panel === "strudel") {
-      setStrudelRuntimeEnabled(true);
-    }
-
     if (isMobile && panel !== "chat" && activePanel === panel) {
       onPanelChange("chat");
       return;
@@ -145,7 +136,6 @@ export function RoomSidebar({
           active={activePanel === "strudel"}
           disabled={strudelDisabled}
           name={name}
-          runtimeEnabled={strudelRuntimeEnabled}
         />
       </div>
     </aside>
