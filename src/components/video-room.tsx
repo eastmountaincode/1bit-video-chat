@@ -232,7 +232,6 @@ export function VideoRoom({ name, onLeave, roomName, stream }: VideoRoomProps) {
         onPanelChange={setActivePanel}
         roomHydra={roomHydra}
         roomName={roomName}
-        strudelDisabled={isLoading}
         videoConnectionStatus={videoConnectionStatus}
       />
     </main>

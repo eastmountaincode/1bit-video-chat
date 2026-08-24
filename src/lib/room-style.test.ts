@@ -93,15 +93,16 @@ test("repairs the rolling v3 mirror as one complete array", () => {
   assert.equal(style.chars?.length, MAX_ROOM_CSS_LENGTH);
 });
 
-test("removes the retired pixel target without changing supported CSS", () => {
+test("removes retired room targets without changing supported CSS", () => {
   const oldCss = [
     '[data-room-part="room"] { color: black; }',
+    '[data-room-part="strudel"] { color: blue; }',
     '[data-room-part="video-pixel"] { filter: blur(1px); }',
     '[data-room-part="video-frame"] { background: white; }',
   ].join("\n");
   const migrated = removeObsoleteRoomStyleTargets(oldCss);
 
-  assert.doesNotMatch(migrated, /video-pixel|blur/);
+  assert.doesNotMatch(migrated, /strudel|video-pixel|blur/);
   assert.match(migrated, /\[data-room-part="room"\]/);
   assert.match(migrated, /\[data-room-part="video-frame"\]/);
   assert.equal(removeObsoleteRoomStyleTargets(migrated), migrated);
@@ -130,7 +131,8 @@ test("removes repeated standalone retired blocks in one migration", () => {
   assert.match(migrated, /\[data-room-part="video-frame"\]/);
 });
 
-test("keeps the retired pixel target out of new and existing v3 styles", () => {
+test("keeps retired targets out of new and existing v3 styles", () => {
+  assert.doesNotMatch(ROOM_STYLE_SCAFFOLD, /strudel/);
   assert.doesNotMatch(ROOM_STYLE_SCAFFOLD, /video-pixel/);
 
   const migrated = normalizeCollaborativeRoomStyleCss(

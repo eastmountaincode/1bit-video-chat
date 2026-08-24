@@ -28,11 +28,11 @@ export const ROOM_STYLE_TARGETS = [
   '[data-room-part="style"]',
   '[data-room-part="hydra"]',
   '[data-room-part="hydra-background"]',
-  '[data-room-part="strudel"]',
 ] as const;
 
 const OBSOLETE_ROOM_STYLE_TARGETS = [
   '[data-room-part="chat-controls"]',
+  '[data-room-part="strudel"]',
   '[data-room-part="video-pixel"]',
 ] as const;
 

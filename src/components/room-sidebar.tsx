@@ -3,7 +3,6 @@
 import { ChatPanel } from "@/components/chat-panel";
 import { HelperPanel } from "@/components/helper-panel";
 import { HydraPanel } from "@/components/hydra-panel";
-import { StrudelPanel } from "@/components/strudel-panel";
 import { StylePanel } from "@/components/style-panel";
 import { useMobileLayout } from "@/hooks/use-mobile-layout";
 import type { CaptureSettings } from "@/lib/capture-settings";
@@ -16,8 +15,7 @@ export type SidebarPanel =
   | "chat"
   | "settings"
   | "style"
-  | "hydra"
-  | "strudel";
+  | "hydra";
 
 interface RoomSidebarProps {
   activePanel: SidebarPanel;
@@ -32,17 +30,10 @@ interface RoomSidebarProps {
   onPanelChange: (panel: SidebarPanel) => void;
   roomHydra: RoomHydraData;
   roomName: string;
-  strudelDisabled: boolean;
   videoConnectionStatus: string | null;
 }
 
-const panels: SidebarPanel[] = [
-  "chat",
-  "settings",
-  "style",
-  "hydra",
-  "strudel",
-];
+const panels: SidebarPanel[] = ["chat", "settings", "style", "hydra"];
 
 export function RoomSidebar({
   activePanel,
@@ -57,7 +48,6 @@ export function RoomSidebar({
   onPanelChange,
   roomHydra,
   roomName,
-  strudelDisabled,
   videoConnectionStatus,
 }: RoomSidebarProps) {
   const isMobile = useMobileLayout();
@@ -131,11 +121,6 @@ export function RoomSidebar({
           onRun={onHydraRun}
           onStop={onHydraStop}
           runtimeStatus={hydraRuntimeStatus}
-        />
-        <StrudelPanel
-          active={activePanel === "strudel"}
-          disabled={strudelDisabled}
-          name={name}
         />
       </div>
     </aside>
