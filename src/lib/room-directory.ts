@@ -14,6 +14,7 @@ const MAX_FUTURE_TIMESTAMP_MS = 5 * 60 * 1_000;
 
 export interface PublicRoom {
   createdAt: number;
+  hydraSketchId?: string;
   id: string;
   name: string;
 }
@@ -157,6 +158,9 @@ export function parsePublicRoom(
   return isValidPublicRoom(record, record.id, now)
     ? {
         createdAt: record.createdAt,
+        ...(typeof record.hydraSketchId === "string" && /^[a-z0-9_]{1,64}$/.test(record.hydraSketchId)
+            ? { hydraSketchId: record.hydraSketchId }
+            : {}),
         id: record.id,
         name: record.name,
       }

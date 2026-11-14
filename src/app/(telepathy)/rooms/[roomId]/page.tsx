@@ -4,6 +4,7 @@ import { ExpiredRoom } from "@/components/expired-room";
 import { PlayHtmlProvider } from "@/components/play-html-provider";
 import { RoomUnavailable } from "@/components/room-unavailable";
 import { VideoChatApp } from "@/components/video-chat-app";
+import { getInitialRoomHydra } from "@/lib/hydra-presets";
 import { isValidRoomId } from "@/lib/room-directory";
 import {
   getPublicRoom,
@@ -36,6 +37,7 @@ export default async function RoomPage({ params }: RoomPageProps) {
   return (
     <PlayHtmlProvider>
       <VideoChatApp
+        initialHydra={getInitialRoomHydra(room.hydraSketchId)}
         initialParticipantCount={participantCount}
         roomId={room.id}
         roomName={room.name}

@@ -16,8 +16,10 @@ import {
   ROOM_PARTICIPANT_CAPACITY,
 } from "@/lib/room-directory";
 import { ROOM_LIST_REFRESH_MS } from "@/lib/room-lifecycle";
+import type { RoomHydraData } from "@/lib/room-hydra";
 
 interface VideoChatAppProps {
+  initialHydra: RoomHydraData;
   initialParticipantCount: number;
   roomId: string;
   roomName: string;
@@ -29,6 +31,7 @@ interface JoinedParticipant {
 }
 
 export function VideoChatApp({
+  initialHydra,
   initialParticipantCount,
   roomId,
   roomName,
@@ -131,6 +134,7 @@ export function VideoChatApp({
   if (participant && stream) {
     return (
       <VideoRoom
+        initialHydra={initialHydra}
         name={participant.name}
         onLeave={leaveRoom}
         roomName={roomName}

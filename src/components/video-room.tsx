@@ -17,7 +17,6 @@ import {
   type CaptureSettings,
 } from "@/lib/capture-settings";
 import {
-  DEFAULT_ROOM_HYDRA,
   normalizeRoomHydraData,
   type HydraRuntimeStatus,
   type RoomHydraData,
@@ -31,13 +30,14 @@ import {
 } from "@/lib/video-payload-rate";
 
 interface VideoRoomProps {
+  initialHydra: RoomHydraData;
   name: string;
   onLeave: () => void;
   roomName: string;
   stream: MediaStream;
 }
 
-export function VideoRoom({ name, onLeave, roomName, stream }: VideoRoomProps) {
+export function VideoRoom({ initialHydra, name, onLeave, roomName, stream }: VideoRoomProps) {
   const [captureSettings, setCaptureSettings] = useState<CaptureSettings>(
     DEFAULT_CAPTURE_SETTINGS,
   );
@@ -45,7 +45,7 @@ export function VideoRoom({ name, onLeave, roomName, stream }: VideoRoomProps) {
   const { isLoading } = usePlayContext();
   const [rawRoomHydra, setRoomHydra] = usePageData<RoomHydraData>(
     "room-hydra:v1",
-    DEFAULT_ROOM_HYDRA,
+    initialHydra,
   );
   const roomHydra = normalizeRoomHydraData(rawRoomHydra);
   const [hydraRuntimeStatus, setHydraRuntimeStatus] =

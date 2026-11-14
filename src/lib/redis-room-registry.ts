@@ -2,6 +2,8 @@ import "server-only";
 
 import { Redis } from "@upstash/redis";
 
+import { chooseHydraSketchId } from "@/lib/hydra-presets";
+
 import {
   createPublicRoomListing,
   createPublicRoom,
@@ -328,6 +330,7 @@ export async function createRegisteredRoom(
 ): Promise<PublicRoom> {
   const room = createPublicRoom(rawName, crypto.randomUUID(), Date.now());
   if (!room) throw new TypeError("Enter a room name.");
+  room.hydraSketchId = chooseHydraSketchId();
 
   const redis = getRedis();
   const rateLimitKey = `${ROOM_KEY_TAG}:create-rate:${rateLimitId}`;
