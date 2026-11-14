@@ -1,0 +1,75 @@
+.page {
+    margin: 0 auto;
+    max-width: 66rem;
+    padding: clamp(1rem, 5vw, 3rem) 1rem;
+}
+
+.header, .toolbar, .actions {
+    align-items: center;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    justify-content: space-between;
+}
+
+.header h1 {
+    font-size: 2rem;
+    font-weight: normal;
+    margin: 0.25rem 0 1rem;
+}
+
+.page a { color: inherit; }
+.actions { justify-content: flex-start; }
+.toolbar { margin: 1.5rem 0 0.75rem; }
+.toolbar p { margin: 0; }
+.muted { color: #666; }
+.error { color: #8b0000; }
+.notice { min-height: 1.3em; }
+
+.login {
+    display: grid;
+    gap: 0.75rem;
+    margin-top: 2rem;
+    max-width: 24rem;
+}
+
+.login label { display: grid; gap: 0.35rem; }
+.login button { justify-self: start; }
+.page button, .page input { min-height: 2.5rem; }
+.page :focus-visible { outline: 3px solid #555; outline-offset: 3px; }
+
+.rooms {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    border-top: 1px solid #aaa;
+}
+
+.room {
+    align-items: center;
+    border-bottom: 1px solid #aaa;
+    display: grid;
+    gap: 1rem;
+    grid-template-columns: minmax(0, 1fr) 9rem auto;
+    padding: 1.1rem 0;
+}
+
+.room h2 { font-size: 1.15rem; margin: 0 0 0.25rem; overflow-wrap: anywhere; }
+.room p { font-size: 0.9rem; margin: 0; }
+.count { font-variant-numeric: tabular-nums; }
+.active { font-weight: bold; }
+.delete { color: #8b0000; }
+.protected { display: inline-block; min-width: 4.5rem; }
+
+.confirmation {
+    grid-column: 1 / -1;
+    border: 1px solid #8b0000;
+    padding: 0.75rem;
+}
+
+.confirmation p { font-size: 1rem; margin-bottom: 0.75rem; }
+
+@media (max-width: 640px) {
+    .room { grid-template-columns: minmax(0, 1fr) auto; }
+    .room > .actions { grid-column: 1 / -1; }
+}

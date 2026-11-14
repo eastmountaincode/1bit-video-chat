@@ -21,6 +21,21 @@ The room synthesizer embeds
 - Entering or leaving a room reloads the document so no prior room transport can leak across the boundary.
 - The right column switches among chat, settings, CSS, and Hydra. Press `H` to open or close settings.
 
+## Room manager
+
+Open `/admin` to see room names, creation times, and current participant counts.
+The list refreshes every ten seconds while visible. Open a room to join it normally,
+or delete it after confirmation. Main room is permanent and cannot be deleted.
+Deletion removes the room from the directory and blocks its URL; connected clients
+leave on their next heartbeat (normally within twenty seconds). It does not erase
+the third-party PlayHTML service's stored chat, CSS, or Hydra data.
+
+Set `TELEPATHY_ADMIN_PASSWORD` to a random password of 24–256 characters in the
+server environment (Vercel Production, or an ignored `.env.local` for development).
+Without it, admin access is disabled. Sessions last twelve hours in an HttpOnly
+cookie, and changing the password invalidates them. Login attempts are limited
+through Redis to eight per IP per fifteen minutes.
+
 ## Development
 
 ```bash

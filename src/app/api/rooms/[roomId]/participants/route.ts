@@ -153,7 +153,7 @@ function invalidParticipantResponse(): Response {
 
 function expiredRoomResponse(): Response {
   return Response.json(
-    { error: "This room has expired." },
+    { error: "This room is no longer available." },
     { headers: NO_STORE_HEADERS, status: 410 },
   );
 }

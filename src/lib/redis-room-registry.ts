@@ -210,6 +210,43 @@ return count
 
 let redisClient: Redis | null = null;
 
+const DELETE_ROOM_SCRIPT = `
+if ARGV[1] == "main" then return -1 end
+redis.call("HDEL", KEYS[2], ARGV[1])
+redis.call("ZREM", KEYS[1], ARGV[1])
+redis.call("DEL", KEYS[3])
+return 1
+`;
+
+const ADMIN_LOGIN_RATE_SCRIPT = `
+local count = redis.call("INCR", KEYS[1])
+if count == 1 then redis.call("PEXPIRE", KEYS[1], 900000) end
+return count
+`;
+
+export async function deleteRegisteredRoom(roomId: string): Promise<void> {
+    if (!isValidRoomId(roomId) || roomId === MAIN_ROOM.id) {
+        throw new TypeError("This room cannot be deleted.");
+    }
+    const result = await getRedis().eval<[string], unknown>(
+        DELETE_ROOM_SCRIPT,
+        [ROOM_INDEX_KEY, ROOM_METADATA_KEY, getRoomParticipantKey(roomId)],
+        [roomId],
+    );
+    if (Number(result) !== 1) throw new RoomRegistryUnavailableError();
+}
+
+export async function allowAdminLoginAttempt(rateLimitId: string): Promise<boolean> {
+    const result = await getRedis().eval<[], unknown>(
+        ADMIN_LOGIN_RATE_SCRIPT,
+        [`${ROOM_KEY_TAG}:admin-login:${rateLimitId}`],
+        [],
+    );
+    const attempts = Number(result);
+    if (!Number.isSafeInteger(attempts) || attempts < 1) throw new RoomRegistryUnavailableError();
+    return attempts <= 8;
+}
+
 export class RoomRegistryUnavailableError extends Error {
   constructor(message = "The room server is unavailable.") {
     super(message);

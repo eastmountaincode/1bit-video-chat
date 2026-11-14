@@ -5,7 +5,7 @@ export function ExpiredRoom() {
         <fieldset>
           <legend>Telepathy</legend>
 
-          <p>This room has expired.</p>
+          <p>This room is no longer available.</p>
 
           <p className="room-back-link">
             {/* A document navigation cannot carry this room's PlayHTML transport into the lobby. */}
