@@ -31,6 +31,7 @@ body {
 button,
 input,
 textarea,
+.about-back-link,
 .about-link,
 .room-join-link {
   border: 1px solid #000000;
@@ -41,6 +42,7 @@ textarea,
 }
 
 button,
+.about-back-link,
 .about-link,
 .room-join-link {
   min-height: 1.75rem;
@@ -50,6 +52,7 @@ button,
 }
 
 button:active,
+.about-back-link:active,
 .about-link:active,
 .room-join-link:active {
   background: #dddddd;
@@ -131,9 +134,11 @@ legend {
   width: 100%;
 }
 
-.about-link {
+.about-link { margin-left: auto; }
+
+.about-link,
+.about-back-link {
     display: inline-block;
-    margin-left: auto;
     text-decoration: none;
     white-space: nowrap;
 }
@@ -145,7 +150,8 @@ legend {
 }
 
 .about-page a { color: inherit; }
-.about-page h1 { font-size: 2rem; font-weight: normal; margin: 1.5rem 0 1rem; }
+.about-header { margin: 1.5rem 0 1rem; }
+.about-page h1 { font-size: 2rem; font-weight: normal; margin: 0; }
 .about-page p { margin: 0 0 1rem; }
 
 .lobby-header h1 {
