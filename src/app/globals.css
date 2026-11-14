@@ -154,6 +154,14 @@ legend {
 .about-page h1 { font-size: 2rem; font-weight: normal; margin: 0; }
 .about-page p { margin: 0 0 1rem; }
 
+.about-author { white-space: nowrap; }
+.about-author-icon {
+    height: 1em;
+    image-rendering: pixelated;
+    vertical-align: -0.15em;
+    width: 1em;
+}
+
 .lobby-header h1 {
   margin: 0;
   font-size: 2rem;

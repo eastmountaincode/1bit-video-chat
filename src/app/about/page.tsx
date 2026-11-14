@@ -30,7 +30,20 @@ export default function AboutPage() {
                 </a>{" "}
                 SFPC class.
             </p>
-            <p>Made by <a href="https://andrew-boylan.com/">Andrew</a>.</p>
+            <p>
+                Made by{" "}
+                <a className="about-author" href="https://andrew-boylan.com/">
+                    Andrew{" "}
+                    <Image
+                        alt=""
+                        className="about-author-icon"
+                        height={32}
+                        src="/andrew.png"
+                        unoptimized
+                        width={32}
+                    />
+                </a>.
+            </p>
         </main>
     );
 }

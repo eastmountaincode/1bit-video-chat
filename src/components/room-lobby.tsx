@@ -95,14 +95,22 @@ export function RoomLobby() {
     };
   }, []);
 
-  useEffect(
-    () => () => {
-      const controller = createRequestRef.current;
-      createRequestRef.current = null;
-      controller?.abort();
-    },
-    [],
-  );
+    useEffect(() => {
+        function resetAfterBackNavigation(event: PageTransitionEvent) {
+            if (!event.persisted) return;
+            createRequestRef.current?.abort();
+            createRequestRef.current = null;
+            setIsCreating(false);
+        }
+
+        window.addEventListener("pageshow", resetAfterBackNavigation);
+        return () => {
+            window.removeEventListener("pageshow", resetAfterBackNavigation);
+            const controller = createRequestRef.current;
+            createRequestRef.current = null;
+            controller?.abort();
+        };
+    }, []);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -130,6 +138,8 @@ export function RoomLobby() {
       ROOM_REQUEST_TIMEOUT_MS,
     );
 
+    let isNavigating = false;
+
     try {
       const response = await fetch("/api/rooms", {
         body: JSON.stringify({ name }),
@@ -140,6 +150,8 @@ export function RoomLobby() {
       });
       const body = await readJsonObject(response);
       const room = parsePublicRoom(body?.room);
+
+        if (createRequestRef.current !== controller) return;
 
       if (!response.ok || !room) {
         if (createRequestRef.current === controller) {
@@ -153,13 +165,14 @@ export function RoomLobby() {
       }
 
       window.location.assign(getRoomHref(room));
+        isNavigating = true;
     } catch {
       if (createRequestRef.current === controller) {
         setError("The room could not be created.");
       }
     } finally {
       window.clearTimeout(timeout);
-      if (createRequestRef.current === controller) {
+      if (!isNavigating && createRequestRef.current === controller) {
         createRequestRef.current = null;
         setIsCreating(false);
       }
@@ -269,7 +282,7 @@ export function RoomLobby() {
                   }
                   type="submit"
                 >
-                  {isCreating ? "Creating..." : "Create room"}
+                  {isCreating ? "Creating room…" : "Create room"}
                 </button>
               </fieldset>
             </form>
