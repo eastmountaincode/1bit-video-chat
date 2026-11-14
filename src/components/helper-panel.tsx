@@ -1,5 +1,6 @@
 "use client";
 
+import { ResolutionControl } from "@/components/resolution-control";
 import {
   CAPTURE_SETTINGS_LIMITS,
   type CaptureSettings,
@@ -16,14 +17,6 @@ export function HelperPanel({
   onChange,
   settings,
 }: HelperPanelProps) {
-  function updateWidth(width: number) {
-    onChange({
-      ...settings,
-      height: Math.round(width * 0.75),
-      width,
-    });
-  }
-
   return (
     <fieldset
       className="settings-panel sidebar-panel"
@@ -32,18 +25,7 @@ export function HelperPanel({
     >
       <legend>settings</legend>
 
-      <label>
-        <span>resolution</span>
-        <input
-          max={CAPTURE_SETTINGS_LIMITS.width.max}
-          min={CAPTURE_SETTINGS_LIMITS.width.min}
-          onChange={(event) => updateWidth(Number(event.target.value))}
-          step={4}
-          type="range"
-          value={settings.width}
-        />
-        <output>{settings.width} × {settings.height}</output>
-      </label>
+        <ResolutionControl onChange={onChange} settings={settings} />
 
       <label>
         <span>gray bits</span>

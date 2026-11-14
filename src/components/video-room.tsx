@@ -12,10 +12,7 @@ import {
 import { VideoTile } from "@/components/video-tile";
 import { useGrayscaleCamera } from "@/hooks/use-grayscale-camera";
 import { useVideoPresence } from "@/hooks/use-video-presence";
-import {
-  DEFAULT_CAPTURE_SETTINGS,
-  type CaptureSettings,
-} from "@/lib/capture-settings";
+import type { CaptureSettings } from "@/lib/capture-settings";
 import {
   normalizeRoomHydraData,
   type HydraRuntimeStatus,
@@ -30,6 +27,8 @@ import {
 } from "@/lib/video-payload-rate";
 
 interface VideoRoomProps {
+    captureSettings: CaptureSettings;
+    onCaptureSettingsChange: (settings: CaptureSettings) => void;
   initialHydra: RoomHydraData;
   name: string;
   onLeave: () => void;
@@ -37,10 +36,7 @@ interface VideoRoomProps {
   stream: MediaStream;
 }
 
-export function VideoRoom({ initialHydra, name, onLeave, roomName, stream }: VideoRoomProps) {
-  const [captureSettings, setCaptureSettings] = useState<CaptureSettings>(
-    DEFAULT_CAPTURE_SETTINGS,
-  );
+export function VideoRoom({ captureSettings, initialHydra, name, onCaptureSettingsChange, onLeave, roomName, stream }: VideoRoomProps) {
   const [activePanel, setActivePanel] = useState<SidebarPanel>("chat");
   const { isLoading } = usePlayContext();
   const [rawRoomHydra, setRoomHydra] = usePageData<RoomHydraData>(
@@ -225,7 +221,7 @@ export function VideoRoom({ initialHydra, name, onLeave, roomName, stream }: Vid
           roomHydra.enabled ? hydraRuntimeStatus : null
         }
         name={name}
-        onCaptureSettingsChange={setCaptureSettings}
+        onCaptureSettingsChange={onCaptureSettingsChange}
         onHydraRun={runHydra}
         onHydraStop={stopHydra}
         onLeave={onLeave}

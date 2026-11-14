@@ -27,11 +27,11 @@ const codePanelSources = ["style", "hydra"].map((panel) => ({
 test("buttons and button-like room links share one visual rule", () => {
   assert.match(
     globalCss,
-    /button,\s*\.about-back-link,\s*\.about-link,\s*\.room-join-link\s*\{[^}]*min-height:\s*1\.75rem;[^}]*padding:\s*0\.125rem 0\.5rem;[^}]*background:\s*#efefef;/s,
+    /button,\s*\.about-back-link,\s*\.about-link,\s*\.room-back-button,\s*\.room-join-link\s*\{[^}]*min-height:\s*1\.75rem;[^}]*padding:\s*0\.125rem 0\.5rem;[^}]*background:\s*#efefef;/s,
   );
   assert.match(
     globalCss,
-    /button:active,\s*\.about-back-link:active,\s*\.about-link:active,\s*\.room-join-link:active\s*\{[^}]*background:\s*#dddddd;/s,
+    /button:active,\s*\.about-back-link:active,\s*\.about-link:active,\s*\.room-back-button:active,\s*\.room-join-link:active\s*\{[^}]*background:\s*#dddddd;/s,
   );
   assert.match(
     globalCss,

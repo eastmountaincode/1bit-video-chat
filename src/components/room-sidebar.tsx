@@ -91,7 +91,7 @@ export function RoomSidebar({
               onClick={onLeave}
               type="button"
             >
-              leave room
+              <span aria-hidden="true">←</span> leave room
             </button>
           </nav>
           <p className="room-current-name">

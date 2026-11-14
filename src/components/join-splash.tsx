@@ -3,10 +3,14 @@
 import { useState, type FormEvent } from "react";
 
 import { GrayscaleCanvas } from "@/components/grayscale-canvas";
+import { ResolutionControl } from "@/components/resolution-control";
 import type { CameraPermission } from "@/hooks/use-camera";
 import { useGrayscaleCamera } from "@/hooks/use-grayscale-camera";
+import type { CaptureSettings } from "@/lib/capture-settings";
 
 interface JoinSplashProps {
+    captureSettings: CaptureSettings;
+    onCaptureSettingsChange: (settings: CaptureSettings) => void;
   capacity: number;
   error: string | null;
   isJoining: boolean;
@@ -19,6 +23,8 @@ interface JoinSplashProps {
 }
 
 export function JoinSplash({
+    captureSettings,
+    onCaptureSettingsChange,
   capacity,
   error,
   isJoining,
@@ -30,7 +36,7 @@ export function JoinSplash({
   stream,
 }: JoinSplashProps) {
   const [name, setName] = useState("");
-  const frame = useGrayscaleCamera(stream);
+    const frame = useGrayscaleCamera(stream, captureSettings);
   const canJoin =
     !isJoining &&
     participantCount < capacity &&
@@ -45,19 +51,17 @@ export function JoinSplash({
   return (
     <main className="splash-page">
       <form className="join-form" onSubmit={handleSubmit}>
-        <fieldset>
-          <legend>Telepathy</legend>
-
+        <fieldset aria-label="Join room">
           <p className="room-back-link">
             {/* A document navigation cannot carry this room's PlayHTML transport into the lobby. */}
             {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
-            <a href="/">
+            <a className="room-back-button" href="/">
               <span aria-hidden="true">←</span> Back to room selection
             </a>
           </p>
 
           <p className="lobby-room-summary">
-            room: <strong>{roomName}</strong>{" "}
+            Joining room: <strong>{roomName}</strong>{" "}
             <span className="room-participant-count">
               ({participantCount}/{capacity})
             </span>
@@ -66,6 +70,11 @@ export function JoinSplash({
           <figure className="preview-frame">
             <GrayscaleCanvas frame={frame} />
           </figure>
+
+            <ResolutionControl
+                onChange={onCaptureSettingsChange}
+                settings={captureSettings}
+            />
 
           <label className="name-field">
             name

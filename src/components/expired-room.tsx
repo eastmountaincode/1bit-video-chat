@@ -10,7 +10,7 @@ export function ExpiredRoom() {
           <p className="room-back-link">
             {/* A document navigation cannot carry this room's PlayHTML transport into the lobby. */}
             {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
-            <a href="/">
+            <a className="room-back-button" href="/">
               <span aria-hidden="true">←</span> Back to room selection
             </a>
           </p>

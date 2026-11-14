@@ -17,6 +17,7 @@ import {
 } from "@/lib/room-directory";
 import { ROOM_LIST_REFRESH_MS } from "@/lib/room-lifecycle";
 import type { RoomHydraData } from "@/lib/room-hydra";
+import { DEFAULT_CAPTURE_SETTINGS, type CaptureSettings } from "@/lib/capture-settings";
 
 interface VideoChatAppProps {
   initialHydra: RoomHydraData;
@@ -36,6 +37,7 @@ export function VideoChatApp({
   roomId,
   roomName,
 }: VideoChatAppProps) {
+    const [captureSettings, setCaptureSettings] = useState<CaptureSettings>(DEFAULT_CAPTURE_SETTINGS);
   const { permission, requestCamera, stream } = useCamera();
   const joinParticipantIdRef = useRef<string | null>(null);
   const [isJoining, setIsJoining] = useState(false);
@@ -134,6 +136,8 @@ export function VideoChatApp({
   if (participant && stream) {
     return (
       <VideoRoom
+        captureSettings={captureSettings}
+        onCaptureSettingsChange={setCaptureSettings}
         initialHydra={initialHydra}
         name={participant.name}
         onLeave={leaveRoom}
@@ -145,6 +149,8 @@ export function VideoChatApp({
 
   return (
     <JoinSplash
+      captureSettings={captureSettings}
+      onCaptureSettingsChange={setCaptureSettings}
       capacity={ROOM_PARTICIPANT_CAPACITY}
       error={joinError}
       isJoining={isJoining}
