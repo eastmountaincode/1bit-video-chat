@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 
 import {
@@ -178,6 +179,7 @@ export function RoomLobby() {
             width={40}
           />
           <h1>Telepathy</h1>
+          <Link className="about-link" href="/about">About</Link>
         </header>
 
         <fieldset

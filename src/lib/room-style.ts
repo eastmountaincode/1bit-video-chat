@@ -36,9 +36,44 @@ const OBSOLETE_ROOM_STYLE_TARGETS = [
   '[data-room-part="video-pixel"]',
 ] as const;
 
-export const ROOM_STYLE_SCAFFOLD = ROOM_STYLE_TARGETS.map(
-  (selector) => `${selector} {\n  \n}`,
-).join("\n\n");
+const ROOM_STYLE_COMMENTS: Record<(typeof ROOM_STYLE_TARGETS)[number], string> = {
+    '[data-room-part="room"]': "The whole room.",
+    '[data-room-part="title"]': "The room title.",
+    '[data-room-part="video-area"]': "The video side of the room.",
+    '[data-room-part="video-field"]': "The box around all the videos.",
+    '[data-room-part="video-grid"]': "How the videos are arranged.",
+    '[data-room-part="video-card"]': "Each person's video card.",
+    '[data-room-part="video-card"][data-video-side="own"]': "Your own video card.",
+    '[data-room-part="video-frame"]': "The video image.",
+    '[data-room-part="video-caption"]': "The name below each video.",
+    '[data-room-part="video-rate"]': "The data rate below each video.",
+    '[data-room-part="leave"]': "The leave room button.",
+    '[data-room-part="divider"]': "The draggable line between the two sides.",
+    '[data-room-part="sidebar"]': "The chat and controls side.",
+    '[data-room-part="sidebar-tabs"]': "The buttons for switching panels.",
+    '[data-room-part="chat"]': "The chat panel.",
+    '[data-room-part="message"]': "Every chat message.",
+    '[data-room-part="message"][data-message-side="own"]': "Your chat messages.",
+    '[data-room-part="message"][data-message-side="other"]': "Everyone else's chat messages.",
+    '[data-room-part="settings"]': "The camera settings panel.",
+    '[data-room-part="style"]': "This CSS editor panel.",
+    '[data-room-part="hydra"]': "The Hydra code panel.",
+    '[data-room-part="hydra-background"]': "The Hydra visuals behind the room.",
+};
+
+function roomStyleBlock(selector: (typeof ROOM_STYLE_TARGETS)[number]) {
+    return `/* ${ROOM_STYLE_COMMENTS[selector]} */\n${selector} {\n    \n}`;
+}
+
+export const ROOM_STYLE_SCAFFOLD = ROOM_STYLE_TARGETS.map(roomStyleBlock).join("\n\n");
+const ORIGINAL_SCAFFOLD = ROOM_STYLE_TARGETS.map((selector) => `${selector}{}`).join("");
+
+export function migrateRoomStyleCss(css: string, scaffoldVersion?: number): string {
+    const current = removeObsoleteRoomStyleTargets(css);
+    return scaffoldVersion !== 1 && current.replace(/\s/g, "") === ORIGINAL_SCAFFOLD
+        ? ROOM_STYLE_SCAFFOLD
+        : current;
+}
 
 export interface RoomStyleData {
   css: string;
@@ -48,6 +83,7 @@ export interface RoomStyleData {
 }
 
 export interface CollaborativeRoomStyleData {
+  scaffoldVersion?: 1;
   /**
    * UTF-16 code units, matching textarea selection offsets. Null means this
    * room has not migrated from the legacy scalar CSS document yet. Retained as
@@ -127,11 +163,11 @@ function hasSelectorBlock(css: string, selector: string) {
 }
 
 export function ensureRoomStyleScaffold(css: string) {
-  const normalizedCss = removeObsoleteRoomStyleTargets(css);
+  const normalizedCss = migrateRoomStyleCss(css);
   const limitedCss = normalizedCss.slice(0, MAX_ROOM_CSS_LENGTH);
   const missingBlocks = ROOM_STYLE_TARGETS.filter(
     (selector) => !hasSelectorBlock(limitedCss, selector),
-  ).map((selector) => `${selector} {\n  \n}`);
+  ).map(roomStyleBlock);
 
   if (missingBlocks.length === 0) return limitedCss;
 

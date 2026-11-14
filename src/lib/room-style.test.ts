@@ -8,10 +8,12 @@ import {
   createRoomStyleDocument,
   getCollaborativeRoomStyleCss,
   MAX_ROOM_CSS_LENGTH,
+    migrateRoomStyleCss,
   normalizeCollaborativeRoomStyleCss,
   readLegacyRoomStyleCss,
   removeObsoleteRoomStyleTargets,
   ROOM_STYLE_SCAFFOLD,
+    ROOM_STYLE_TARGETS,
   syncLegacyRoomStyleCharacters,
   type CollaborativeRoomStyleData,
 } from "./room-style.ts";
@@ -19,6 +21,20 @@ import {
   createTextEntries,
   readTextEntriesSafely,
 } from "./shared-text-entries.ts";
+
+test("adds comments to an untouched template and leaves custom CSS intact", () => {
+    const original = ROOM_STYLE_TARGETS.map((selector) => `${selector} {\n  \n}`).join("\n\n");
+    assert.equal(migrateRoomStyleCss(original), ROOM_STYLE_SCAFFOLD);
+    const customized = original.replace('[data-room-part="room"] {', '[data-room-part="room"] { color: red;');
+    assert.equal(migrateRoomStyleCss(customized), customized);
+    assert.equal(migrateRoomStyleCss(""), "");
+});
+
+test("does not restore comments deliberately removed after migration", () => {
+    const withoutComments = ROOM_STYLE_SCAFFOLD.replace(/\/\*.*?\*\/\n/g, "");
+    assert.equal(migrateRoomStyleCss(withoutComments, 1), withoutComments);
+    assert.equal(migrateRoomStyleCss(ROOM_STYLE_SCAFFOLD, 1), ROOM_STYLE_SCAFFOLD);
+});
 
 test("keeps deliberate v4 CSS deletion and replacement intact", () => {
   assert.equal(normalizeCollaborativeRoomStyleCss("", 4), "");

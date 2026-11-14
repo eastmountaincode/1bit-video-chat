@@ -1,7 +1,7 @@
 .page {
     margin: 0 auto;
-    max-width: 66rem;
-    padding: clamp(1rem, 5vw, 3rem) 1rem;
+    max-width: 60rem;
+    padding: clamp(1rem, 4vw, 2rem) 1rem;
 }
 
 .header, .toolbar, .actions {
@@ -13,18 +13,18 @@
 }
 
 .header h1 {
-    font-size: 2rem;
+    font-size: 1.75rem;
     font-weight: normal;
-    margin: 0.25rem 0 1rem;
+    margin: 0.25rem 0 0;
 }
 
 .page a { color: inherit; }
-.actions { justify-content: flex-start; }
+.actions { flex-wrap: nowrap; justify-content: flex-start; }
 .toolbar { margin: 1.5rem 0 0.75rem; }
 .toolbar p { margin: 0; }
-.muted { color: #666; }
-.error { color: #8b0000; }
-.notice { min-height: 1.3em; }
+.error, .delete { color: #8b0000; }
+.notice { margin: 0.75rem 0; }
+.notice:empty { display: none; }
 
 .login {
     display: grid;
@@ -35,41 +35,31 @@
 
 .login label { display: grid; gap: 0.35rem; }
 .login button { justify-self: start; }
-.page button, .page input { min-height: 2.5rem; }
+.page button { min-height: 2rem; }
+.page input { min-height: 2.5rem; }
 .page :focus-visible { outline: 3px solid #555; outline-offset: 3px; }
 
-.rooms {
-    list-style: none;
-    margin: 0;
-    padding: 0;
-    border-top: 1px solid #aaa;
-}
-
-.room {
-    align-items: center;
-    border-bottom: 1px solid #aaa;
-    display: grid;
-    gap: 1rem;
-    grid-template-columns: minmax(0, 1fr) 9rem auto;
-    padding: 1.1rem 0;
-}
-
-.room h2 { font-size: 1.15rem; margin: 0 0 0.25rem; overflow-wrap: anywhere; }
-.room p { font-size: 0.9rem; margin: 0; }
-.count { font-variant-numeric: tabular-nums; }
-.active { font-weight: bold; }
-.delete { color: #8b0000; }
-.protected { display: inline-block; min-width: 4.5rem; }
+.tableWrapper { overflow-x: auto; }
+.rooms { border-collapse: collapse; min-width: 34rem; width: 100%; }
+.rooms th, .rooms td { border-bottom: 1px solid #aaa; padding: 0.45rem 0.5rem; text-align: left; }
+.rooms thead th { color: #666; font-size: 0.85rem; font-weight: normal; }
+.rooms th:first-child, .rooms td:first-child { padding-left: 0; }
+.rooms th:last-child, .rooms td:last-child { padding-right: 0; width: 1%; }
+.rooms .name { font-weight: normal; max-width: 20rem; overflow-wrap: anywhere; }
+.created { color: #666; white-space: nowrap; }
+.rooms .count { font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+.protected { color: #666; display: inline-block; min-width: 4rem; }
 
 .confirmation {
-    grid-column: 1 / -1;
     border: 1px solid #8b0000;
+    margin-bottom: 0.75rem;
     padding: 0.75rem;
 }
 
-.confirmation p { font-size: 1rem; margin-bottom: 0.75rem; }
+.rooms .confirmation { margin: 0; }
+.confirmation p { margin: 0 0 0.75rem; }
+.visuallyHidden { clip-path: inset(50%); height: 1px; overflow: hidden; position: absolute; white-space: nowrap; width: 1px; }
 
-@media (max-width: 640px) {
-    .room { grid-template-columns: minmax(0, 1fr) auto; }
-    .room > .actions { grid-column: 1 / -1; }
+@media (pointer: coarse) {
+    .page button, .page input { min-height: 2.75rem; }
 }

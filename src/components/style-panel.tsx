@@ -26,6 +26,7 @@ import {
   ensureRoomStyleScaffold,
   getCollaborativeRoomStyleCss,
   MAX_ROOM_CSS_LENGTH,
+  migrateRoomStyleCss,
   readLegacyRoomStyleCss,
   removeObsoleteRoomStyleTargets,
   ROOM_STYLE_SCAFFOLD,
@@ -116,7 +117,7 @@ export function StylePanel({ active, name }: StylePanelProps) {
   const migratedSharedCss =
     decodedSharedCss === null
       ? null
-      : removeObsoleteRoomStyleTargets(decodedSharedCss);
+      : migrateRoomStyleCss(decodedSharedCss, sharedDocument.scaffoldVersion);
   const rawSharedCss =
     sharedEntries === null
       ? getCollaborativeRoomStyleCss(sharedDocument, legacyCss)
@@ -137,7 +138,7 @@ export function StylePanel({ active, name }: StylePanelProps) {
   const currentDocumentNeedsMigration =
     hasCurrentDocument &&
     decodedSharedCss !== null &&
-    migratedSharedCss !== decodedSharedCss;
+    (migratedSharedCss !== decodedSharedCss || sharedDocument.scaffoldVersion !== 1);
   const legacyMirrorIsMalformed =
     legacyCharacters !== null && legacyMirrorCss === null;
   const legacyMirrorExceedsLimit =
@@ -244,6 +245,7 @@ export function StylePanel({ active, name }: StylePanelProps) {
           Date.now(),
         );
         syncLegacyRoomStyleCharacters(draft, sourceCss);
+        draft.scaffoldVersion = 1;
         draft.updatedAt = Date.now();
         draft.updatedBy = name;
         draft.version = 3;
@@ -302,7 +304,7 @@ export function StylePanel({ active, name }: StylePanelProps) {
           currentChanged = true;
         }
 
-        const migratedCss = removeObsoleteRoomStyleTargets(nextCss);
+        const migratedCss = migrateRoomStyleCss(nextCss, draft.scaffoldVersion);
         if (migratedCss !== nextCss) {
           nextCss = migratedCss;
           currentChanged = true;
@@ -320,7 +322,8 @@ export function StylePanel({ active, name }: StylePanelProps) {
           draft,
           nextCss,
         );
-        const versionChanged = draft.version !== 3;
+        const versionChanged = draft.version !== 3 || draft.scaffoldVersion !== 1;
+        draft.scaffoldVersion = 1;
         if (currentChanged || mirrorChanged || versionChanged) {
           draft.updatedAt = Date.now();
           draft.updatedBy = name;
@@ -662,6 +665,7 @@ export function StylePanel({ active, name }: StylePanelProps) {
         Date.now(),
       );
       syncLegacyRoomStyleCharacters(draft, ROOM_STYLE_SCAFFOLD);
+      draft.scaffoldVersion = 1;
       draft.updatedAt = Date.now();
       draft.updatedBy = name;
       draft.version = 3;

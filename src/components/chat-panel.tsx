@@ -4,6 +4,7 @@ import { usePageData, usePlayContext } from "@playhtml/react";
 import { memo, useEffect, useRef, useState, type FormEvent } from "react";
 
 import { useMobileLayout } from "@/hooks/use-mobile-layout";
+import { usePageScrollLock } from "@/hooks/use-page-scroll-lock";
 import type { ChatLedger } from "@/lib/shared-types";
 
 const MAX_MESSAGES = 200;
@@ -25,6 +26,8 @@ export const ChatPanel = memo(function ChatPanel({ active, name }: ChatPanelProp
   const isMobile = useMobileLayout();
   const isVisible = isMobile ? isOpen : active;
   const listRef = useRef<HTMLOListElement>(null);
+
+    usePageScrollLock(isMobile && isOpen);
 
   useEffect(() => {
     if (isVisible) {

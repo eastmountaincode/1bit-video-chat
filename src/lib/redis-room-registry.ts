@@ -220,6 +220,19 @@ redis.call("DEL", KEYS[3])
 return 1
 `;
 
+const DELETE_ROOMS_SCRIPT = `
+for _, id in ipairs(ARGV) do
+    if id == "main" then return -1 end
+end
+local deleted = 0
+for index, id in ipairs(ARGV) do
+    deleted = deleted + redis.call("HDEL", KEYS[2], id)
+    redis.call("ZREM", KEYS[1], id)
+    redis.call("DEL", KEYS[index + 2])
+end
+return deleted
+`;
+
 const ADMIN_LOGIN_RATE_SCRIPT = `
 local count = redis.call("INCR", KEYS[1])
 if count == 1 then redis.call("PEXPIRE", KEYS[1], 900000) end
@@ -247,6 +260,24 @@ export async function allowAdminLoginAttempt(rateLimitId: string): Promise<boole
     const attempts = Number(result);
     if (!Number.isSafeInteger(attempts) || attempts < 1) throw new RoomRegistryUnavailableError();
     return attempts <= 8;
+}
+
+export async function deleteRegisteredRooms(roomIds: string[]): Promise<number> {
+    if (roomIds.length === 0 || roomIds.length >= MAX_PUBLIC_ROOMS ||
+        new Set(roomIds).size !== roomIds.length ||
+        roomIds.some((id) => !isValidRoomId(id) || id === MAIN_ROOM.id)) {
+        throw new TypeError("Invalid rooms to delete.");
+    }
+    const result = await getRedis().eval<string[], unknown>(
+        DELETE_ROOMS_SCRIPT,
+        [ROOM_INDEX_KEY, ROOM_METADATA_KEY, ...roomIds.map(getRoomParticipantKey)],
+        roomIds,
+    );
+    const deleted = Number(result);
+    if (!Number.isSafeInteger(deleted) || deleted < 0 || deleted > roomIds.length) {
+        throw new RoomRegistryUnavailableError();
+    }
+    return deleted;
 }
 
 export class RoomRegistryUnavailableError extends Error {
