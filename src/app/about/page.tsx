@@ -20,15 +20,15 @@ export default function AboutPage() {
                 <h1>Telepathy</h1>
             </header>
             <p>
-                Telepathy is lo-fi video chat, customizable per room using CSS and{" "}
+                Telepathy is lofi video chat, customizable per room using CSS and{" "}
                 <a href="https://hydra.ojack.xyz/">Hydra</a>.
             </p>
             <p>
-                Created in summer 2026 during Spencer Chang&apos;s{" "}
+                Created in July 2026 during Spencer Chang&apos;s{" "}
                 <a href="https://spencer.place/creation/building-benches-for-the-web/">
                     Building Benches for the Web
                 </a>{" "}
-                class at SFPC.
+                SFPC class.
             </p>
             <p>Made by <a href="https://andrew-boylan.com/">Andrew</a>.</p>
         </main>
