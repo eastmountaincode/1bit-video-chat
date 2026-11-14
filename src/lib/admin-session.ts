@@ -4,7 +4,7 @@ export const ADMIN_SESSION_SECONDS = 12 * 60 * 60;
 export const ADMIN_COOKIE_NAME = "telepathy-admin";
 
 export function isAdminPasswordConfigured(password: unknown): password is string {
-    return typeof password === "string" && password.length >= 24 && password.length <= 256;
+    return typeof password === "string" && password.length > 0 && password.length <= 256;
 }
 
 export function matchesAdminPassword(candidate: unknown, password: string): boolean {

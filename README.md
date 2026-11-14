@@ -30,7 +30,7 @@ Deletion removes the room from the directory and blocks its URL; connected clien
 leave on their next heartbeat (normally within twenty seconds). It does not erase
 the third-party PlayHTML service's stored chat, CSS, or Hydra data.
 
-Set `TELEPATHY_ADMIN_PASSWORD` to a random password of 24–256 characters in the
+Set `TELEPATHY_ADMIN_PASSWORD` to a nonempty password (up to 256 characters) in the
 server environment (Vercel Production, or an ignored `.env.local` for development).
 Without it, admin access is disabled. Sessions last twelve hours in an HttpOnly
 cookie, and changing the password invalidates them. Login attempts are limited

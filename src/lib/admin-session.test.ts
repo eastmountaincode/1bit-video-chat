@@ -10,15 +10,20 @@ import {
     verifyAdminSession,
 } from "./admin-session.ts";
 
-const password = "a-test-only-password-with-more-than-24-characters";
+const password = "test-password";
 const now = 1_800_000_000_000;
 
-test("admin access fails closed without a strong configured password", () => {
-    for (const value of [undefined, "", "short", "x".repeat(257)]) {
+test("admin access accepts short passwords but rejects missing or invalid configuration", () => {
+    for (const value of [undefined, null, 123, "", "x".repeat(257)]) {
         assert.equal(isAdminPasswordConfigured(value), false);
         assert.equal(verifyAdminSession("anything", value, now), false);
     }
     assert.throws(() => createAdminSession(""));
+    for (const value of ["x", "short", "x".repeat(23), "x".repeat(24), "x".repeat(256)]) {
+        assert.equal(isAdminPasswordConfigured(value), true);
+        assert.equal(matchesAdminPassword(value, value), true);
+        assert.equal(verifyAdminSession(createAdminSession(value, now), value, now), true);
+    }
     assert.equal(matchesAdminPassword(password, password), true);
     assert.equal(matchesAdminPassword(`${password}x`, password), false);
     assert.equal(matchesAdminPassword(null, password), false);
