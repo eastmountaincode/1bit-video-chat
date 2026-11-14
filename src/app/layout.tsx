@@ -15,7 +15,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
     <html lang="en">
         <body>
             {children}
-            <LayoutDebug />
+            {process.env.NODE_ENV === "development" ? <LayoutDebug /> : null}
         </body>
     </html>
   );

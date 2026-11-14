@@ -680,7 +680,7 @@ export function StylePanel({ active, name }: StylePanelProps) {
         data-room-part="style"
         hidden={!active}
       >
-        <legend>style</legend>
+        <legend>css</legend>
         <textarea
           aria-describedby={editorInstructionsId}
           aria-label="room css"

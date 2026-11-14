@@ -78,7 +78,7 @@ export function JoinSplash({
           </label>
 
           <div className="button-row">
-            {!stream && permission !== "unavailable" ? (
+            {!stream ? (
               <button
                 disabled={permission === "checking" || permission === "denied"}
                 onClick={() => void requestCamera()}
@@ -101,6 +101,11 @@ export function JoinSplash({
           {permission === "denied" ? (
             <p className="form-note">Allow camera access in browser settings.</p>
           ) : null}
+            {permission === "unavailable" ? (
+                <p className="form-note error-note" role="alert">
+                    Camera unavailable. Check that a camera is connected and try again.
+                </p>
+            ) : null}
         </fieldset>
       </form>
     </main>
