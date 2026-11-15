@@ -15,6 +15,7 @@ import {
   readLegacyRoomStyleCss,
   removeObsoleteRoomStyleTargets,
   ROOM_STYLE_SCAFFOLD,
+    ROOM_STYLE_TEMPLATE_REVISION,
     ROOM_STYLE_TARGETS,
   syncLegacyRoomStyleCharacters,
   type CollaborativeRoomStyleData,
@@ -52,8 +53,8 @@ test("comment migration skips strings and existing comments and respects the siz
 
 test("does not restore comments deliberately removed after migration", () => {
     const withoutComments = ROOM_STYLE_SCAFFOLD.replace(/\/\*.*?\*\/\n/g, "");
-    assert.equal(migrateRoomStyleCss(withoutComments, 1, 1), withoutComments);
-    assert.equal(migrateRoomStyleCss(ROOM_STYLE_SCAFFOLD, 1, 1), ROOM_STYLE_SCAFFOLD);
+    assert.equal(migrateRoomStyleCss(withoutComments, 1, ROOM_STYLE_TEMPLATE_REVISION), withoutComments);
+    assert.equal(migrateRoomStyleCss(ROOM_STYLE_SCAFFOLD, 1, ROOM_STYLE_TEMPLATE_REVISION), ROOM_STYLE_SCAFFOLD);
 });
 
 test("template cleanup retains styled advanced targets, personal notes, strings, and nested rules", () => {
@@ -68,16 +69,36 @@ test("template cleanup retains styled advanced targets, personal notes, strings,
     assert.ok(migrated.includes(`body { content: '[data-room-part="video-area"] {}'; }`));
     assert.ok(migrated.includes('@media (width < 700px) { [data-room-part="leave"] {} }'));
     assert.ok(migrated.includes('[data-room-part="message-author"]'));
-    assert.equal(migrateRoomStyleCss(migrated, 1, 1), migrated);
+    assert.equal(migrateRoomStyleCss(migrated, 1, ROOM_STYLE_TEMPLATE_REVISION), migrated);
     const removedByUser = migrated.replace(/\/\* Names in chat\. \*\/\n\[data-room-part="message-author"\]\s*\{\s*\}/, "");
-    assert.equal(migrateRoomStyleCss(removedByUser, 1, 1), removedByUser);
+    assert.equal(migrateRoomStyleCss(removedByUser, 1, ROOM_STYLE_TEMPLATE_REVISION), removedByUser);
 });
 
 test("scaffolding does not truncate custom CSS to make room for default sections", () => {
     const css = `body { --value: "${"x".repeat(MAX_ROOM_CSS_LENGTH - 23)}"; }`;
     assert.ok(css.length <= MAX_ROOM_CSS_LENGTH);
     assert.equal(ensureRoomStyleScaffold(css), css);
-    assert.equal(DEFAULT_ROOM_STYLE_TARGETS.length, 12);
+    assert.equal(DEFAULT_ROOM_STYLE_TARGETS.length, 10);
+});
+
+test("simplifies existing defaults without removing custom grid or message text styles", () => {
+    const css = `/* How the videos are arranged. */\n[data-room-part="video-grid"] {\n    \n}\n` +
+        `/* The text of each message. */\n[data-room-part="message-text"] {}\n` +
+        `/* Your chat messages. */\n[data-room-part="message"][data-message-side="own"] { color: red; }`;
+    const migrated = migrateRoomStyleCss(css, 1, 1);
+    assert.doesNotMatch(migrated, /video-grid|message-text/);
+    assert.match(migrated, /\/\* Your own chat messages\. \*\//);
+    assert.match(migrated, /color: red;/);
+    assert.doesNotMatch(migrated, /message-author|message-time/);
+    assert.equal(migrateRoomStyleCss(migrated, 1, ROOM_STYLE_TEMPLATE_REVISION), migrated);
+
+    const custom = `[data-room-part="video-grid"] { gap: 2rem; }\n` +
+        `[data-room-part="message-text"] { color: green; }\n` +
+        `body { content: '/* Your chat messages. */'; }`;
+    assert.equal(migrateRoomStyleCss(custom, 1, 1), custom);
+    assert.equal(migrateRoomStyleCss(css, 1, ROOM_STYLE_TEMPLATE_REVISION + 1), css);
+    const full = '/* Your chat messages. */\nbody { color: red; }'.padEnd(MAX_ROOM_CSS_LENGTH, ' ');
+    assert.equal(migrateRoomStyleCss(full, 1, 1), full);
 });
 
 test("keeps deliberate v4 CSS deletion and replacement intact", () => {

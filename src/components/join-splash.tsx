@@ -3,6 +3,7 @@
 import { useState, type FormEvent } from "react";
 
 import { GrayscaleCanvas } from "@/components/grayscale-canvas";
+import { GrayBitsControl } from "@/components/gray-bits-control";
 import { ResolutionControl } from "@/components/resolution-control";
 import type { CameraPermission } from "@/hooks/use-camera";
 import { useGrayscaleCamera } from "@/hooks/use-grayscale-camera";
@@ -72,6 +73,10 @@ export function JoinSplash({
           </figure>
 
             <ResolutionControl
+                onChange={onCaptureSettingsChange}
+                settings={captureSettings}
+            />
+            <GrayBitsControl
                 onChange={onCaptureSettingsChange}
                 settings={captureSettings}
             />

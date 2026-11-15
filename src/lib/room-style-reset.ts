@@ -1,6 +1,6 @@
 import * as Y from "yjs";
 
-import { createRoomStyleDocument, ROOM_STYLE_SCAFFOLD, ROOM_STYLE_COMMENTS_VERSION, ROOM_STYLE_TEMPLATE_VERSION } from "./room-style.ts";
+import { createRoomStyleDocument, ROOM_STYLE_SCAFFOLD, ROOM_STYLE_COMMENTS_VERSION, ROOM_STYLE_TEMPLATE_VERSION, ROOM_STYLE_TEMPLATE_REVISION } from "./room-style.ts";
 
 export function resetSharedRoomStyle(document: Y.Doc, id: string, now: number): void {
     document.transact(() => {
@@ -18,6 +18,7 @@ export function resetSharedRoomStyle(document: Y.Doc, id: string, now: number): 
         style.set("scaffoldVersion", 1);
         style.set("commentsVersion", ROOM_STYLE_COMMENTS_VERSION);
         style.set("templateVersion", ROOM_STYLE_TEMPLATE_VERSION);
+        style.set("templateRevision", ROOM_STYLE_TEMPLATE_REVISION);
         style.set("version", 3);
         style.set("updatedAt", now);
         style.set("updatedBy", "Admin");

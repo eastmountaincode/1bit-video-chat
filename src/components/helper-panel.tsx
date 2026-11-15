@@ -1,6 +1,7 @@
 "use client";
 
 import { ResolutionControl } from "@/components/resolution-control";
+import { GrayBitsControl } from "@/components/gray-bits-control";
 import {
   CAPTURE_SETTINGS_LIMITS,
   type CaptureSettings,
@@ -27,23 +28,7 @@ export function HelperPanel({
 
         <ResolutionControl onChange={onChange} settings={settings} />
 
-      <label>
-        <span>gray bits</span>
-        <input
-          max={CAPTURE_SETTINGS_LIMITS.grayscaleBits.max}
-          min={CAPTURE_SETTINGS_LIMITS.grayscaleBits.min}
-          onChange={(event) =>
-            onChange({
-              ...settings,
-              grayscaleBits: Number(event.target.value),
-            })
-          }
-          step={1}
-          type="range"
-          value={settings.grayscaleBits}
-        />
-        <output>{settings.grayscaleBits}</output>
-      </label>
+        <GrayBitsControl onChange={onChange} settings={settings} />
 
       <label>
         <span>fps</span>

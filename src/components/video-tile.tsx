@@ -157,8 +157,8 @@ export const VideoTile = memo(function VideoTile({
         frame={frame}
         renderWhenOffscreen={renderWhenOffscreen}
       />
-      <figcaption data-room-part="video-caption">
-        <span className="video-caption-name">
+      <figcaption>
+        <span className="video-caption-name" data-room-part="video-caption">
           {name}
           {isMe ? " (you)" : ""}
         </span>

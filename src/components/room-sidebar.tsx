@@ -94,7 +94,7 @@ export function RoomSidebar({
               <span aria-hidden="true">←</span> leave room
             </button>
           </nav>
-          <p className="room-current-name">
+          <p className="room-current-name" data-room-part="title">
             room: <strong>{roomName}</strong>
           </p>
         </div>

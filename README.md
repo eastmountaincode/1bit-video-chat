@@ -14,7 +14,7 @@ The room synthesizer embeds
 - Room style is shared, persistent raw CSS with URL support, stable `data-room-part` targets, a 20,000-character limit, and a global reset.
 - The Hydra editor is a shared character-sequence document, so concurrent edits merge live. Running the current draft stores a separate room-wide snapshot and places an isolated Hydra canvas above the CSS room background and behind the room interface; stopping it reveals the CSS background again.
 - New rooms receive a randomly selected starter from 49 self-contained [Hydra homepage examples](https://github.com/hydra-synth/hydra/blob/main/src/stores/examples.json). The choice is saved with the room, and Hydra stays off until someone presses Run. Existing sketches are preserved. Original credits and [CC BY-NC-SA 4.0 terms](src/lib/hydra-examples.LICENSE.md) accompany the examples.
-- The default CSS template focuses on 12 sections, including separate own/other messages, chat names, dates, and message text. Other `data-room-part` targets remain available manually.
+- The default CSS template focuses on 10 sections, including separate own/other messages, chat names, and dates. Other `data-room-part` targets remain available manually.
 - Randomize in the Hydra panel loads a different starter into the shared draft. Run or Update applies it.
 - Each viewer can target only their own card with `[data-room-part="video-card"][data-video-side="own"]`.
 - The server-backed lobby lists public rooms. Creating rooms requires admin access.

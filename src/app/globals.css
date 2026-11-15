@@ -551,7 +551,8 @@ legend {
 }
 
 .settings-panel label,
-.resolution-control {
+.resolution-control,
+.gray-bits-control {
   align-items: center;
   display: grid;
   gap: 0.35rem;
@@ -563,7 +564,8 @@ legend {
 }
 
 .settings-panel input[type="range"],
-.resolution-control input[type="range"] {
+.resolution-control input[type="range"],
+.gray-bits-control input[type="range"] {
   border: 0;
   min-height: auto;
   padding: 0;
@@ -571,7 +573,8 @@ legend {
 }
 
 .settings-panel output,
-.resolution-control output {
+.resolution-control output,
+.gray-bits-control output {
   text-align: right;
 }
 
