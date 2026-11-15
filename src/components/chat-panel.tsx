@@ -120,8 +120,8 @@ export const ChatPanel = memo(function ChatPanel({ active, name }: ChatPanelProp
                 key={item.id}
               >
                 <span className="message-meta">
-                  <strong>{item.author}</strong>{" "}
-                  <time dateTime={new Date(item.sentAt).toISOString()}>
+                  <strong data-room-part="message-author">{item.author}</strong>{" "}
+                  <time data-room-part="message-time" dateTime={new Date(item.sentAt).toISOString()}>
                     {new Date(item.sentAt).toLocaleString([], {
                       year: "numeric",
                       month: "short",
@@ -131,7 +131,7 @@ export const ChatPanel = memo(function ChatPanel({ active, name }: ChatPanelProp
                     })}
                   </time>
                 </span>
-                <span>{item.text}</span>
+                <span data-room-part="message-text">{item.text}</span>
               </li>
             ))}
           </ol>

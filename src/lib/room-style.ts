@@ -5,6 +5,7 @@ import {
 
 export const MAX_ROOM_CSS_LENGTH = 20_000;
 export const ROOM_STYLE_COMMENTS_VERSION = 1;
+export const ROOM_STYLE_TEMPLATE_VERSION = 1;
 
 export const ROOM_STYLE_TARGETS = [
   '[data-room-part="room"]',
@@ -25,11 +26,35 @@ export const ROOM_STYLE_TARGETS = [
   '[data-room-part="message"]',
   '[data-room-part="message"][data-message-side="own"]',
   '[data-room-part="message"][data-message-side="other"]',
+  '[data-room-part="message-author"]',
+  '[data-room-part="message-time"]',
+  '[data-room-part="message-text"]',
   '[data-room-part="settings"]',
   '[data-room-part="style"]',
   '[data-room-part="hydra"]',
   '[data-room-part="hydra-background"]',
 ] as const;
+
+export const DEFAULT_ROOM_STYLE_TARGETS = [
+    '[data-room-part="room"]',
+    '[data-room-part="title"]',
+    '[data-room-part="video-field"]',
+    '[data-room-part="video-grid"]',
+    '[data-room-part="video-card"]',
+    '[data-room-part="video-caption"]',
+    '[data-room-part="chat"]',
+    '[data-room-part="message"][data-message-side="own"]',
+    '[data-room-part="message"][data-message-side="other"]',
+    '[data-room-part="message-author"]',
+    '[data-room-part="message-time"]',
+    '[data-room-part="message-text"]',
+] as const satisfies readonly (typeof ROOM_STYLE_TARGETS)[number][];
+
+const NEW_CHAT_TARGETS: readonly (typeof ROOM_STYLE_TARGETS)[number][] = [
+    '[data-room-part="message-author"]',
+    '[data-room-part="message-time"]',
+    '[data-room-part="message-text"]',
+];
 
 const OBSOLETE_ROOM_STYLE_TARGETS = [
   '[data-room-part="chat-controls"]',
@@ -56,6 +81,9 @@ const ROOM_STYLE_COMMENTS: Record<(typeof ROOM_STYLE_TARGETS)[number], string> =
     '[data-room-part="message"]': "Every chat message.",
     '[data-room-part="message"][data-message-side="own"]': "Your chat messages.",
     '[data-room-part="message"][data-message-side="other"]': "Everyone else's chat messages.",
+    '[data-room-part="message-author"]': "Names in chat.",
+    '[data-room-part="message-time"]': "Chat dates and times.",
+    '[data-room-part="message-text"]': "The text of each message.",
     '[data-room-part="settings"]': "The camera settings panel.",
     '[data-room-part="style"]': "This CSS editor panel.",
     '[data-room-part="hydra"]': "The Hydra code panel.",
@@ -66,14 +94,74 @@ function roomStyleBlock(selector: (typeof ROOM_STYLE_TARGETS)[number]) {
     return `/* ${ROOM_STYLE_COMMENTS[selector]} */\n${selector} {\n    \n}`;
 }
 
-export const ROOM_STYLE_SCAFFOLD = ROOM_STYLE_TARGETS.map(roomStyleBlock).join("\n\n");
-const ORIGINAL_SCAFFOLD = ROOM_STYLE_TARGETS.map((selector) => `${selector}{}`).join("");
+export const ROOM_STYLE_SCAFFOLD = DEFAULT_ROOM_STYLE_TARGETS.map(roomStyleBlock).join("\n\n");
+const ORIGINAL_SCAFFOLD = ROOM_STYLE_TARGETS.filter((selector) => !NEW_CHAT_TARGETS.includes(selector))
+    .map((selector) => `${selector}{}`).join("");
 
-export function migrateRoomStyleCss(css: string, commentsVersion?: number): string {
-    const current = removeObsoleteRoomStyleTargets(css);
+export function migrateRoomStyleCss(css: string, commentsVersion?: number, templateVersion?: number): string {
+    let current = removeObsoleteRoomStyleTargets(css);
+    if (templateVersion !== ROOM_STYLE_TEMPLATE_VERSION) {
+        let uncommented = current;
+        for (const comment of Object.values(ROOM_STYLE_COMMENTS)) uncommented = uncommented.replaceAll(`/* ${comment} */`, "");
+        if (uncommented.replace(/\s/g, "") === ORIGINAL_SCAFFOLD) return ROOM_STYLE_SCAFFOLD;
+        current = simplifyRoomStyleTemplate(current);
+    }
     if (commentsVersion === ROOM_STYLE_COMMENTS_VERSION) return current;
-    if (current.replace(/\s/g, "") === ORIGINAL_SCAFFOLD) return ROOM_STYLE_SCAFFOLD;
     return addRoomStyleComments(current);
+}
+
+function simplifyRoomStyleTemplate(css: string): string {
+    const defaults: readonly string[] = DEFAULT_ROOM_STYLE_TARGETS;
+    const retired = new Set<string>(ROOM_STYLE_TARGETS.filter((selector) => !defaults.includes(selector)));
+    const removals: { start: number; end: number }[] = [];
+    let boundary = 0;
+    let quote = "";
+    const stack: { start: number; open: number; selector: string; leading: string }[] = [];
+    let hasChat = false;
+    for (let index = 0; index < css.length; index += 1) {
+        const character = css[index];
+        if (quote) {
+            if (character === "\\") index += 1;
+            else if (character === quote) quote = "";
+            continue;
+        }
+        if (character === "/" && css[index + 1] === "*") {
+            const end = css.indexOf("*/", index + 2);
+            if (end < 0) break;
+            index = end + 1;
+            continue;
+        }
+        if (character === '"' || character === "'") {
+            quote = character;
+            continue;
+        }
+        if (character === "{") {
+            const segment = css.slice(boundary, index);
+            const leading = /^(?:\s|\/\*[\s\S]*?\*\/)*/.exec(segment)?.[0] ?? "";
+            const selector = segment.slice(leading.length).trim();
+            if (selector === '[data-room-part="chat"]' || selector.startsWith('[data-room-part="message"]')) hasChat = true;
+            stack.push({ start: boundary, open: index, selector, leading });
+            boundary = index + 1;
+        } else if (character === "}") {
+            const rule = stack.pop();
+            if (rule && stack.length === 0 && retired.has(rule.selector) && !css.slice(rule.open + 1, index).trim()) {
+                const comment = `/* ${ROOM_STYLE_COMMENTS[rule.selector as keyof typeof ROOM_STYLE_COMMENTS]} */`;
+                const generated = !rule.leading.replace(comment, "").trim();
+                removals.push({ start: rule.start + (generated ? 0 : rule.leading.length), end: index + 1 });
+            }
+            boundary = index + 1;
+        } else if (character === ";") boundary = index + 1;
+    }
+    let result = css;
+    for (const { start, end } of removals.reverse()) result = result.slice(0, start) + result.slice(end);
+    if (hasChat) {
+        for (const selector of NEW_CHAT_TARGETS) {
+            if (hasSelectorBlock(result, selector)) continue;
+            const block = `\n\n${roomStyleBlock(selector)}`;
+            if (result.length + block.length <= MAX_ROOM_CSS_LENGTH) result += block;
+        }
+    }
+    return result;
 }
 
 function addRoomStyleComments(css: string): string {
@@ -130,6 +218,7 @@ export interface RoomStyleData {
 export interface CollaborativeRoomStyleData {
   scaffoldVersion?: 1;
   commentsVersion?: 1;
+  templateVersion?: 1;
   /**
    * UTF-16 code units, matching textarea selection offsets. Null means this
    * room has not migrated from the legacy scalar CSS document yet. Retained as
@@ -211,15 +300,18 @@ function hasSelectorBlock(css: string, selector: string) {
 export function ensureRoomStyleScaffold(css: string) {
   const normalizedCss = migrateRoomStyleCss(css);
   const limitedCss = normalizedCss.slice(0, MAX_ROOM_CSS_LENGTH);
-  const missingBlocks = ROOM_STYLE_TARGETS.filter(
+  const missingBlocks = DEFAULT_ROOM_STYLE_TARGETS.filter(
     (selector) => !hasSelectorBlock(limitedCss, selector),
   ).map(roomStyleBlock);
 
   if (missingBlocks.length === 0) return limitedCss;
 
-  const suffix = `\n\n${missingBlocks.join("\n\n")}`;
-  const availableLength = Math.max(0, MAX_ROOM_CSS_LENGTH - suffix.length);
-  return `${limitedCss.slice(0, availableLength).trimEnd()}${suffix}`;
+  let result = limitedCss;
+  for (const block of missingBlocks) {
+    const next = `${result.trimEnd()}\n\n${block}`;
+    if (next.length <= MAX_ROOM_CSS_LENGTH) result = next;
+  }
+  return result;
 }
 
 export function removeObsoleteRoomStyleTargets(css: string) {

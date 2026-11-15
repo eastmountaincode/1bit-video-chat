@@ -397,6 +397,22 @@ export function useCollaborativeCodeEditor({
     onRunShortcut?.(code);
   }
 
+    function replaceCode(code: string) {
+        if (controlsDisabled || !currentDocumentIsEditable || isComposingRef.current || code.length > maxLength) return;
+        const now = Date.now();
+        const next = createCollaborativeCodeDocument(code, crypto.randomUUID(), now, maxLength);
+        setSharedDocument((draft) => {
+            draft.current = next;
+            draft.updatedAt = now;
+            draft.updatedBy = name;
+            draft.version = 1;
+        });
+        documentIdRef.current = next.id;
+        compositionFinalValueRef.current = null;
+        updateEditor(code, next.entries, { start: 0, end: 0, direction: "none" });
+        if (textareaRef.current) textareaRef.current.scrollTop = 0;
+    }
+
   function handleChange(event: ChangeEvent<HTMLTextAreaElement>) {
     const nextValue = event.currentTarget.value;
     const nextSelection = readSelection(event.currentTarget);
@@ -557,6 +573,7 @@ export function useCollaborativeCodeEditor({
     handleKeyDown,
     handleSelect,
     runCurrentCode,
+    replaceCode,
     runDisabled:
       controlsDisabled ||
       !currentDocumentIsEditable ||

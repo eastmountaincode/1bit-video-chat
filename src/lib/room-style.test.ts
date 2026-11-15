@@ -6,6 +6,8 @@ import * as Y from "yjs";
 
 import {
   createRoomStyleDocument,
+  DEFAULT_ROOM_STYLE_TARGETS,
+  ensureRoomStyleScaffold,
   getCollaborativeRoomStyleCss,
   MAX_ROOM_CSS_LENGTH,
     migrateRoomStyleCss,
@@ -22,13 +24,17 @@ import {
   readTextEntriesSafely,
 } from "./shared-text-entries.ts";
 
-test("adds comments to existing templates without changing their declarations", () => {
-    const original = ROOM_STYLE_TARGETS.map((selector) => `${selector} {\n  \n}`).join("\n\n");
+test("simplifies the old default template while preserving customized declarations", () => {
+    const original = ROOM_STYLE_TARGETS.filter((selector) => !/message-(author|time|text)/.test(selector))
+        .map((selector) => `${selector} {\n  \n}`).join("\n\n");
     assert.equal(migrateRoomStyleCss(original), ROOM_STYLE_SCAFFOLD);
     const customized = original.replace('[data-room-part="room"] {', '[data-room-part="room"] { color: red;');
     const migrated = migrateRoomStyleCss(customized);
     assert.match(migrated, /\/\* The whole room\. \*\//);
-    assert.equal(migrated.replace(/\/\*.*?\*\/\n/g, ""), customized);
+    assert.match(migrated, /\[data-room-part="room"\] \{ color: red;/);
+    assert.doesNotMatch(migrated, /data-room-part="divider"/);
+    assert.doesNotMatch(migrated, /data-room-part="video-area"/);
+    for (const selector of DEFAULT_ROOM_STYLE_TARGETS) assert.ok(migrated.includes(selector));
     assert.equal(migrateRoomStyleCss(""), "");
 });
 
@@ -46,8 +52,32 @@ test("comment migration skips strings and existing comments and respects the siz
 
 test("does not restore comments deliberately removed after migration", () => {
     const withoutComments = ROOM_STYLE_SCAFFOLD.replace(/\/\*.*?\*\/\n/g, "");
-    assert.equal(migrateRoomStyleCss(withoutComments, 1), withoutComments);
-    assert.equal(migrateRoomStyleCss(ROOM_STYLE_SCAFFOLD, 1), ROOM_STYLE_SCAFFOLD);
+    assert.equal(migrateRoomStyleCss(withoutComments, 1, 1), withoutComments);
+    assert.equal(migrateRoomStyleCss(ROOM_STYLE_SCAFFOLD, 1, 1), ROOM_STYLE_SCAFFOLD);
+});
+
+test("template cleanup retains styled advanced targets, personal notes, strings, and nested rules", () => {
+    const css = `/* My divider experiment. */\n[data-room-part="divider"] { background: red; }\n` +
+        `/* Keep this note. */\n[data-room-part="sidebar"] {}\n` +
+        `body { content: '[data-room-part="video-area"] {}'; }\n` +
+        `@media (width < 700px) { [data-room-part="leave"] {} }\n` +
+        `[data-room-part="chat"] { color: blue; }`;
+    const migrated = migrateRoomStyleCss(css, 1);
+    assert.match(migrated, /divider"\] \{ background: red;/);
+    assert.ok(migrated.includes('/* Keep this note. */'));
+    assert.ok(migrated.includes(`body { content: '[data-room-part="video-area"] {}'; }`));
+    assert.ok(migrated.includes('@media (width < 700px) { [data-room-part="leave"] {} }'));
+    assert.ok(migrated.includes('[data-room-part="message-author"]'));
+    assert.equal(migrateRoomStyleCss(migrated, 1, 1), migrated);
+    const removedByUser = migrated.replace(/\/\* Names in chat\. \*\/\n\[data-room-part="message-author"\]\s*\{\s*\}/, "");
+    assert.equal(migrateRoomStyleCss(removedByUser, 1, 1), removedByUser);
+});
+
+test("scaffolding does not truncate custom CSS to make room for default sections", () => {
+    const css = `body { --value: "${"x".repeat(MAX_ROOM_CSS_LENGTH - 23)}"; }`;
+    assert.ok(css.length <= MAX_ROOM_CSS_LENGTH);
+    assert.equal(ensureRoomStyleScaffold(css), css);
+    assert.equal(DEFAULT_ROOM_STYLE_TARGETS.length, 12);
 });
 
 test("keeps deliberate v4 CSS deletion and replacement intact", () => {
@@ -171,7 +201,7 @@ test("keeps retired targets out of new and existing v3 styles", () => {
   );
 
   assert.doesNotMatch(migrated, /video-pixel/);
-  assert.match(migrated, /\[data-room-part="video-frame"\]/);
+  assert.match(migrated, /\[data-room-part="video-card"\]/);
 });
 
 test("20 simultaneous resets select one complete document epoch", () => {
@@ -222,7 +252,7 @@ test("20 simultaneous resets select one complete document epoch", () => {
       .join("");
     assert.equal(text, ROOM_STYLE_SCAFFOLD);
     assert.equal(
-      text?.split('[data-room-part="style"]').length - 1,
+      text?.split('[data-room-part="chat"]').length - 1,
       1,
     );
     assert.equal(client.style.chars?.join(""), ROOM_STYLE_SCAFFOLD);

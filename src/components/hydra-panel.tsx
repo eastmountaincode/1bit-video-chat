@@ -3,6 +3,7 @@
 import { useId } from "react";
 
 import { useCollaborativeCodeEditor } from "@/hooks/use-collaborative-code-editor";
+import { chooseRandomHydraCode } from "@/lib/hydra-randomizer";
 import {
   DEFAULT_COLLABORATIVE_ROOM_HYDRA,
   MAX_HYDRA_CODE_LENGTH,
@@ -41,6 +42,7 @@ export function HydraPanel({
     handleKeyDown,
     handleSelect,
     runCurrentCode,
+    replaceCode,
     runDisabled,
     textareaRef,
   } = useCollaborativeCodeEditor({
@@ -96,6 +98,13 @@ export function HydraPanel({
         </p>
       ) : null}
       <div className="hydra-panel-footer">
+        <button
+          disabled={editorDisabled}
+          onClick={() => replaceCode(chooseRandomHydraCode(editorValue))}
+          type="button"
+        >
+          randomize
+        </button>
         {hydra.enabled ? (
           <button
             disabled={controlsDisabled}

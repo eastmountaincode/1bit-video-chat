@@ -117,7 +117,7 @@ export function StylePanel({ active, name }: StylePanelProps) {
   const migratedSharedCss =
     decodedSharedCss === null
       ? null
-      : migrateRoomStyleCss(decodedSharedCss, sharedDocument.commentsVersion);
+      : migrateRoomStyleCss(decodedSharedCss, sharedDocument.commentsVersion, sharedDocument.templateVersion);
   const rawSharedCss =
     sharedEntries === null
       ? getCollaborativeRoomStyleCss(sharedDocument, legacyCss)
@@ -138,7 +138,7 @@ export function StylePanel({ active, name }: StylePanelProps) {
   const currentDocumentNeedsMigration =
     hasCurrentDocument &&
     decodedSharedCss !== null &&
-    (migratedSharedCss !== decodedSharedCss || sharedDocument.commentsVersion !== 1);
+    (migratedSharedCss !== decodedSharedCss || (sharedDocument.commentsVersion !== 1 || sharedDocument.templateVersion !== 1));
   const legacyMirrorIsMalformed =
     legacyCharacters !== null && legacyMirrorCss === null;
   const legacyMirrorExceedsLimit =
@@ -247,6 +247,7 @@ export function StylePanel({ active, name }: StylePanelProps) {
         syncLegacyRoomStyleCharacters(draft, sourceCss);
         draft.scaffoldVersion = 1;
         draft.commentsVersion = 1;
+        draft.templateVersion = 1;
         draft.updatedAt = Date.now();
         draft.updatedBy = name;
         draft.version = 3;
@@ -305,7 +306,7 @@ export function StylePanel({ active, name }: StylePanelProps) {
           currentChanged = true;
         }
 
-        const migratedCss = migrateRoomStyleCss(nextCss, draft.commentsVersion);
+        const migratedCss = migrateRoomStyleCss(nextCss, draft.commentsVersion, draft.templateVersion);
         if (migratedCss !== nextCss) {
           nextCss = migratedCss;
           currentChanged = true;
@@ -323,9 +324,10 @@ export function StylePanel({ active, name }: StylePanelProps) {
           draft,
           nextCss,
         );
-        const versionChanged = draft.version !== 3 || (draft.scaffoldVersion !== 1 || draft.commentsVersion !== 1);
+        const versionChanged = draft.version !== 3 || (draft.scaffoldVersion !== 1 || draft.commentsVersion !== 1 || draft.templateVersion !== 1);
         draft.scaffoldVersion = 1;
         draft.commentsVersion = 1;
+        draft.templateVersion = 1;
         if (currentChanged || mirrorChanged || versionChanged) {
           draft.updatedAt = Date.now();
           draft.updatedBy = name;
@@ -669,6 +671,7 @@ export function StylePanel({ active, name }: StylePanelProps) {
       syncLegacyRoomStyleCharacters(draft, ROOM_STYLE_SCAFFOLD);
       draft.scaffoldVersion = 1;
       draft.commentsVersion = 1;
+      draft.templateVersion = 1;
       draft.updatedAt = Date.now();
       draft.updatedBy = name;
       draft.version = 3;

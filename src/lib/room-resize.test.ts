@@ -7,7 +7,7 @@ import {
   getDraggedRoomSidebarWidth,
   getRoomResizeBounds,
 } from "./room-resize.ts";
-import { ROOM_STYLE_SCAFFOLD } from "./room-style.ts";
+import { ROOM_STYLE_SCAFFOLD, ROOM_STYLE_TARGETS } from "./room-style.ts";
 
 const globalCss = readFileSync(
   new URL("../app/globals.css", import.meta.url),
@@ -65,7 +65,8 @@ test("the plain draggable separator sits between video and sidebar", () => {
   assert.doesNotMatch(resizeHandle, /onKeyDown=/);
   assert.doesNotMatch(resizeHandle, /tabIndex=/);
   assert.doesNotMatch(resizeHandle, /title=/);
-  assert.match(ROOM_STYLE_SCAFFOLD, /\[data-room-part="divider"\]/);
+  assert.ok(ROOM_STYLE_TARGETS.includes('[data-room-part="divider"]'));
+  assert.doesNotMatch(ROOM_STYLE_SCAFFOLD, /\[data-room-part="divider"\]/);
 });
 
 test("the divider is one visible pixel with an undecorated grab area", () => {

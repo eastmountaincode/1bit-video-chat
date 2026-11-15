@@ -4,6 +4,7 @@ import { Script } from "node:vm";
 
 import { HYDRA_EXAMPLES } from "./hydra-examples.ts";
 import { chooseHydraSketchId, getInitialRoomHydra } from "./hydra-presets.ts";
+import { chooseRandomHydraCode, formatHydraExample } from "./hydra-randomizer.ts";
 import { createPublicRoomListing, parsePublicRoom, parsePublicRoomListing } from "./room-directory.ts";
 import { DEFAULT_ROOM_HYDRA, MAX_HYDRA_CODE_LENGTH } from "./room-hydra.ts";
 
@@ -39,4 +40,14 @@ test("legacy rooms keep their original default without inventing a stored sketch
     assert.deepEqual(getInitialRoomHydra("unknown_sketch"), DEFAULT_ROOM_HYDRA);
     assert.deepEqual(parsePublicRoom({ ...legacy, hydraSketchId: "bad/id" }, 2000), legacy);
     assert.deepEqual(parsePublicRoom({ ...legacy, hydraSketchId: 42 }, 2000), legacy);
+});
+
+test("randomization reaches every starter, retains credits, and avoids repeating the current sketch", () => {
+    for (const [index, sketch] of HYDRA_EXAMPLES.entries()) {
+        const selected = chooseRandomHydraCode("custom sketch", () => (index + 0.5) / HYDRA_EXAMPLES.length);
+        assert.equal(selected, formatHydraExample(sketch));
+        assert.ok(selected.length <= MAX_HYDRA_CODE_LENGTH);
+        assert.notEqual(chooseRandomHydraCode(selected, () => 0), selected);
+        assert.notEqual(chooseRandomHydraCode(sketch.code, () => 0), selected);
+    }
 });

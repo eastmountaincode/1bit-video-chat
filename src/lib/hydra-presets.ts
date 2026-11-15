@@ -1,6 +1,7 @@
 import { randomInt } from "node:crypto";
 
 import { HYDRA_EXAMPLES } from "./hydra-examples.ts";
+import { formatHydraExample } from "./hydra-randomizer.ts";
 import { DEFAULT_ROOM_HYDRA, type RoomHydraData } from "./room-hydra.ts";
 
 export function chooseHydraSketchId(): string {
@@ -13,6 +14,6 @@ export function getInitialRoomHydra(sketchId?: string): RoomHydraData {
 
     return {
         ...DEFAULT_ROOM_HYDRA,
-        code: `// licensed with CC BY-NC-SA 4.0 https://creativecommons.org/licenses/by-nc-sa/4.0/\n// https://hydra.ojack.xyz/?sketch_id=${sketch.id}\n${sketch.code}`,
+        code: formatHydraExample(sketch),
     };
 }
