@@ -78,7 +78,7 @@ export function getPublicRooms(
   if (Array.isArray(value)) {
     for (const candidate of value.slice(0, MAX_PUBLIC_ROOMS * 4)) {
       const room = parsePublicRoom(candidate, now);
-      if (room && room.id !== MAIN_ROOM.id) {
+      if (room && (room.id !== MAIN_ROOM.id || room.createdAt === 0)) {
         roomsById.set(room.id, room);
       }
     }

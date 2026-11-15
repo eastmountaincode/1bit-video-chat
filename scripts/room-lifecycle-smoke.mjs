@@ -7,7 +7,7 @@ const baseUrlArgument = process.argv
   .slice(2)
   .find((argument) => argument.startsWith("--base-url="));
 const baseUrl = new URL(
-  baseUrlArgument?.slice("--base-url=".length) ?? "http://127.0.0.1:3000",
+  baseUrlArgument?.slice("--base-url=".length) ?? "http://localhost:3000",
 );
 const startedAt = Date.now();
 const roomName = `Room lifecycle smoke ${startedAt}`;
@@ -30,11 +30,27 @@ assert.equal(
   "Main room is missing.",
 );
 
-const createResponse = await request("/api/rooms", {
+const password = process.env.TELEPATHY_ADMIN_PASSWORD;
+assert.ok(password, "Set TELEPATHY_ADMIN_PASSWORD to run the room smoke test.");
+const publicCreate = await request("/api/rooms", { method: "POST" });
+assert.equal(publicCreate.status, 405, "Public creation must be disabled.");
+const unsignedCreate = await request("/api/admin/rooms", { method: "POST" });
+assert.equal(unsignedCreate.status, 401, "Room creation must require admin authentication.");
+const login = await request("/api/admin/session", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Origin: baseUrl.origin },
+    body: JSON.stringify({ password }),
+});
+assert.equal(login.status, 200, await describe(login));
+const adminCookie = login.headers.get("set-cookie")?.split(";", 1)[0];
+assert.ok(adminCookie);
+const createResponse = await request("/api/admin/rooms", {
   body: JSON.stringify({ name: roomName }),
   headers: {
     "Content-Type": "application/json",
     "x-vercel-forwarded-for": `room-smoke-${startedAt}`,
+    Origin: baseUrl.origin,
+    Cookie: adminCookie,
   },
   method: "POST",
 });
@@ -44,6 +60,17 @@ assert.equal(typeof createdBody?.room?.id, "string");
 const roomId = createdBody.room.id;
 
 await waitForRoomListing(roomId, true);
+const renamed = await request(`/api/admin/rooms/${encodeURIComponent(roomId)}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", Origin: baseUrl.origin, Cookie: adminCookie },
+    body: JSON.stringify({ name: "Renamed smoke room" }),
+});
+assert.equal(renamed.status, 200, await describe(renamed));
+const renamedRoom = (await renamed.json()).room;
+assert.equal(renamedRoom.id, roomId);
+assert.equal(renamedRoom.createdAt, createdBody.room.createdAt);
+assert.equal(renamedRoom.hydraSketchId, createdBody.room.hydraSketchId);
+assert.equal(renamedRoom.name, "Renamed smoke room");
 
 const participantIds = Array.from({ length: 21 }, () =>
   crypto.randomUUID().replaceAll("-", ""),

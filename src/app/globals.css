@@ -179,26 +179,6 @@ legend {
   width: 2.5rem;
 }
 
-.room-create-form fieldset {
-  display: grid;
-  gap: 0.75rem;
-  margin: 0;
-  padding: 0.75rem;
-}
-
-.room-name-field {
-  display: grid;
-  gap: 0.25rem;
-}
-
-.room-create-form button {
-  justify-self: end;
-}
-
-.room-create-toggle {
-  justify-self: start;
-}
-
 .lobby-note {
   color: var(--muted);
   margin: -0.5rem 0 0;

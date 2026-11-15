@@ -1,9 +1,25 @@
-import { ADMIN_HEADERS, adminError, isAdminAuthenticated } from "@/lib/admin-auth";
+import { ADMIN_HEADERS, adminError, isAdminAuthenticated, readAdminRoomName } from "@/lib/admin-auth";
 import { isSameOriginRequest } from "@/lib/admin-session";
 import { isValidRoomId, MAIN_ROOM } from "@/lib/room-directory";
-import { deleteRegisteredRoom } from "@/lib/redis-room-registry";
+import { deleteRegisteredRoom, renameRegisteredRoom } from "@/lib/redis-room-registry";
 
 export const dynamic = "force-dynamic";
+
+export async function PATCH(request: Request, { params }: { params: Promise<{ roomId: string }> }) {
+    if (!await isAdminAuthenticated()) return adminError("Please sign in.", 401);
+    if (!isSameOriginRequest(request)) return adminError("Invalid request origin.", 403);
+    const { roomId } = await params;
+    if (!isValidRoomId(roomId)) return adminError("Invalid room.", 400);
+    const name = await readAdminRoomName(request);
+    if (name instanceof Response) return name;
+    try {
+        const room = await renameRegisteredRoom(roomId, name);
+        if (!room) return adminError("Room not found.", 404);
+        return Response.json({ room }, { headers: ADMIN_HEADERS });
+    } catch {
+        return adminError("Could not rename the room.", 503);
+    }
+}
 
 export async function DELETE(request: Request, { params }: { params: Promise<{ roomId: string }> }) {
     if (!await isAdminAuthenticated()) return adminError("Please sign in.", 401);

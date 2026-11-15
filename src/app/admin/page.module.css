@@ -39,6 +39,19 @@
 .page input { min-height: 2.5rem; }
 .page :focus-visible { outline: 3px solid #555; outline-offset: 3px; }
 
+.roomForm {
+    align-items: center;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin: 0.75rem 0;
+}
+.roomForm input { flex: 1; min-width: 8rem; max-width: 24rem; }
+.roomForm button { white-space: nowrap; }
+.rooms .roomForm { margin: 0.25rem 0; }
+.rooms .actions { gap: 0.5rem; }
+.rooms button { white-space: nowrap; }
+
 .tableWrapper { overflow-x: auto; }
 .rooms { border-collapse: collapse; min-width: 34rem; width: 100%; }
 .rooms th, .rooms td { border-bottom: 1px solid #aaa; padding: 0.45rem 0.5rem; text-align: left; }

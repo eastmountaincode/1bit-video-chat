@@ -22,12 +22,26 @@ import {
   readTextEntriesSafely,
 } from "./shared-text-entries.ts";
 
-test("adds comments to an untouched template and leaves custom CSS intact", () => {
+test("adds comments to existing templates without changing their declarations", () => {
     const original = ROOM_STYLE_TARGETS.map((selector) => `${selector} {\n  \n}`).join("\n\n");
     assert.equal(migrateRoomStyleCss(original), ROOM_STYLE_SCAFFOLD);
     const customized = original.replace('[data-room-part="room"] {', '[data-room-part="room"] { color: red;');
-    assert.equal(migrateRoomStyleCss(customized), customized);
+    const migrated = migrateRoomStyleCss(customized);
+    assert.match(migrated, /\/\* The whole room\. \*\//);
+    assert.equal(migrated.replace(/\/\*.*?\*\/\n/g, ""), customized);
     assert.equal(migrateRoomStyleCss(""), "");
+});
+
+test("comment migration skips strings and existing comments and respects the size limit", () => {
+    const css = `/* My background. */\n[data-room-part="room"] { color: red; }\n` +
+        `body { content: '[data-room-part="title"] {}'; }\n` +
+        `/* [data-room-part="video-area"] {} */\n` +
+        `@media (width < 700px) {\n    [data-room-part = 'title'] { color: blue; }\n}`;
+    const migrated = migrateRoomStyleCss(css);
+    assert.equal(migrated, css.replace("    [data-room-part = 'title']", "    /* The room title. */\n    [data-room-part = 'title']"));
+    assert.equal(migrateRoomStyleCss(migrated), migrated);
+    const full = '[data-room-part="room"] {' + ' '.repeat(MAX_ROOM_CSS_LENGTH - 26) + '}';
+    assert.equal(migrateRoomStyleCss(full), full);
 });
 
 test("does not restore comments deliberately removed after migration", () => {

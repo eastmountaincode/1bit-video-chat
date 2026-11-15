@@ -11,6 +11,7 @@ import {
   isValidRoomId,
   MAIN_ROOM,
   MAX_PUBLIC_ROOMS,
+  normalizeRoomName,
   parsePublicRoom,
   ROOM_PARTICIPANT_CAPACITY,
   type PublicRoom,
@@ -91,6 +92,8 @@ end
 
 local ids = redis.call("ZREVRANGE", KEYS[1], 0, tonumber(ARGV[1]) - 1)
 local rooms = {}
+local main = redis.call("HGET", KEYS[2], "main")
+if main then table.insert(rooms, main) end
 for _, id in ipairs(ids) do
   local room = redis.call("HGET", KEYS[2], id)
   if room then
@@ -239,6 +242,41 @@ if count == 1 then redis.call("PEXPIRE", KEYS[1], 900000) end
 return count
 `;
 
+const RENAME_ROOM_SCRIPT = `
+local raw = redis.call("HGET", KEYS[2], ARGV[1])
+if ARGV[1] == "main" then
+    if not raw then raw = ARGV[3] end
+else
+    local deadline = redis.call("ZSCORE", KEYS[1], ARGV[1])
+    if not raw or not deadline then return nil end
+    if ${ROOM_EXPIRY_ENABLED_LUA} then
+        local time = redis.call("TIME")
+        local now = tonumber(time[1]) * 1000 + math.floor(tonumber(time[2]) / 1000)
+        if tonumber(deadline) <= now then return nil end
+    end
+end
+local room = cjson.decode(raw)
+room.name = ARGV[2]
+local updated = cjson.encode(room)
+redis.call("HSET", KEYS[2], ARGV[1], updated)
+return updated
+`;
+
+export async function renameRegisteredRoom(roomId: string, rawName: unknown): Promise<PublicRoom | null> {
+    const name = normalizeRoomName(rawName);
+    if (!isValidRoomId(roomId)) throw new TypeError("Invalid room.");
+    if (!name) throw new TypeError("Enter a room name.");
+    const stored = await getRedis().eval<[string, string, string], unknown>(
+        RENAME_ROOM_SCRIPT,
+        [ROOM_INDEX_KEY, ROOM_METADATA_KEY],
+        [roomId, name, JSON.stringify(MAIN_ROOM)],
+    );
+    if (stored === null) return null;
+    const room = decodeStoredRoom(stored);
+    if (!room || room.id !== roomId) throw new RoomRegistryUnavailableError();
+    return room;
+}
+
 export async function deleteRegisteredRoom(roomId: string): Promise<void> {
     if (!isValidRoomId(roomId) || roomId === MAIN_ROOM.id) {
         throw new TypeError("This room cannot be deleted.");
@@ -335,7 +373,13 @@ export async function listPublicRooms(): Promise<PublicRoomListing[]> {
 export async function getPublicRoom(
   roomId: string,
 ): Promise<PublicRoom | null> {
-  if (roomId === MAIN_ROOM.id) return MAIN_ROOM;
+  if (roomId === MAIN_ROOM.id) {
+    const stored = await getRedis().hget(ROOM_METADATA_KEY, MAIN_ROOM.id);
+    if (stored === null) return MAIN_ROOM;
+    const room = decodeStoredRoom(stored);
+    if (!room || room.id !== MAIN_ROOM.id) throw new RoomRegistryUnavailableError();
+    return room;
+  }
   if (!isValidRoomId(roomId)) return null;
 
   const redis = getRedis();

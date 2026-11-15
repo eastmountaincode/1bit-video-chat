@@ -4,6 +4,7 @@ import {
 } from "./shared-text-entries.ts";
 
 export const MAX_ROOM_CSS_LENGTH = 20_000;
+export const ROOM_STYLE_COMMENTS_VERSION = 1;
 
 export const ROOM_STYLE_TARGETS = [
   '[data-room-part="room"]',
@@ -68,11 +69,55 @@ function roomStyleBlock(selector: (typeof ROOM_STYLE_TARGETS)[number]) {
 export const ROOM_STYLE_SCAFFOLD = ROOM_STYLE_TARGETS.map(roomStyleBlock).join("\n\n");
 const ORIGINAL_SCAFFOLD = ROOM_STYLE_TARGETS.map((selector) => `${selector}{}`).join("");
 
-export function migrateRoomStyleCss(css: string, scaffoldVersion?: number): string {
+export function migrateRoomStyleCss(css: string, commentsVersion?: number): string {
     const current = removeObsoleteRoomStyleTargets(css);
-    return scaffoldVersion !== 1 && current.replace(/\s/g, "") === ORIGINAL_SCAFFOLD
-        ? ROOM_STYLE_SCAFFOLD
-        : current;
+    if (commentsVersion === ROOM_STYLE_COMMENTS_VERSION) return current;
+    if (current.replace(/\s/g, "") === ORIGINAL_SCAFFOLD) return ROOM_STYLE_SCAFFOLD;
+    return addRoomStyleComments(current);
+}
+
+function addRoomStyleComments(css: string): string {
+    const additions: { at: number; text: string }[] = [];
+    let boundary = 0;
+    let quote = "";
+    let length = css.length;
+    for (let index = 0; index < css.length; index += 1) {
+        const character = css[index];
+        if (quote) {
+            if (character === "\\") index += 1;
+            else if (character === quote) quote = "";
+            continue;
+        }
+        if (character === "/" && css[index + 1] === "*") {
+            const end = css.indexOf("*/", index + 2);
+            if (end < 0) break;
+            index = end + 1;
+            continue;
+        }
+        if (character === '"' || character === "'") {
+            quote = character;
+            continue;
+        }
+        if (character === "{") {
+            const segment = css.slice(boundary, index);
+            const leading = /^(?:\s|\/\*[\s\S]*?\*\/)*/.exec(segment)?.[0] ?? "";
+            const selector = segment.slice(leading.length).trim()
+                .replace(/\[\s*data-([\w-]+)\s*=\s*(['"])(.*?)\2\s*\]/g, '[data-$1="$3"]');
+            if (Object.hasOwn(ROOM_STYLE_COMMENTS, selector) && !leading.includes("/*")) {
+                const comment = ROOM_STYLE_COMMENTS[selector as keyof typeof ROOM_STYLE_COMMENTS];
+                const indent = /(?:^|\n)([\t ]*)$/.exec(leading)?.[1] ?? "";
+                const text = `/* ${comment} */\n${indent}`;
+                if (length + text.length <= MAX_ROOM_CSS_LENGTH) {
+                    additions.push({ at: boundary + leading.length, text });
+                    length += text.length;
+                }
+            }
+        }
+        if (character === "{" || character === "}" || character === ";") boundary = index + 1;
+    }
+    let result = css;
+    for (const { at, text } of additions.reverse()) result = result.slice(0, at) + text + result.slice(at);
+    return result;
 }
 
 export interface RoomStyleData {
@@ -84,6 +129,7 @@ export interface RoomStyleData {
 
 export interface CollaborativeRoomStyleData {
   scaffoldVersion?: 1;
+  commentsVersion?: 1;
   /**
    * UTF-16 code units, matching textarea selection offsets. Null means this
    * room has not migrated from the legacy scalar CSS document yet. Retained as

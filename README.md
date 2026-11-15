@@ -15,7 +15,7 @@ The room synthesizer embeds
 - The Hydra editor is a shared character-sequence document, so concurrent edits merge live. Running the current draft stores a separate room-wide snapshot and places an isolated Hydra canvas above the CSS room background and behind the room interface; stopping it reveals the CSS background again.
 - New rooms receive a randomly selected starter from 49 self-contained [Hydra homepage examples](https://github.com/hydra-synth/hydra/blob/main/src/stores/examples.json). The choice is saved with the room, and Hydra stays off until someone presses Run. Existing sketches are preserved. Original credits and [CC BY-NC-SA 4.0 terms](src/lib/hydra-examples.LICENSE.md) accompany the examples.
 - Each viewer can target only their own card with `[data-room-part="video-card"][data-video-side="own"]`.
-- The server-backed lobby lists public rooms and lets anyone create one.
+- The server-backed lobby lists public rooms. Creating rooms requires admin access.
 - Every room admits at most 20 active participants, with atomic server-side admission and live counts in the directory and camera lobby.
 - Automatic empty-room deletion is currently disabled. The two-minute expiry policy and deadline bookkeeping remain in place behind `ROOM_EXPIRY_ENABLED`, so they can be restored with a one-line switch; Main room remains permanent.
 - Every room has its own isolated video presence, chat, and shared style state.
@@ -27,7 +27,9 @@ The room synthesizer embeds
 
 Open `/admin` to see room names, creation times, and current participant counts.
 The list refreshes every ten seconds while visible. Open a room to join it normally,
-or delete it after confirmation. Main room is permanent and cannot be deleted.
+create or rename rooms, reset their CSS, or delete them after confirmation.
+Renaming preserves the room URL and shared content. CSS reset restores the commented
+defaults without changing chat or Hydra. Main room can be renamed but cannot be deleted.
 Deletion removes the room from the directory and blocks its URL; connected clients
 leave on their next heartbeat (normally within twenty seconds). It does not erase
 the third-party PlayHTML service's stored chat, CSS, or Hydra data.
@@ -50,7 +52,8 @@ The room server uses Upstash Redis through either
 `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN`.
 Set `TELEPATHY_ROOM_REGISTRY_NAMESPACE` to isolate local lifecycle tests.
 
-With the app running, the live room smoke test creates one temporary room,
+With the app running and `TELEPATHY_ADMIN_PASSWORD` set, the live room smoke test
+checks admin-only creation, creates and renames one temporary room,
 admits 20 participants concurrently, rejects the twenty-first, frees and
 reuses one place, and checks missing-room handling:
 

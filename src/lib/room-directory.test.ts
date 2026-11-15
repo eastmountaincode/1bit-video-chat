@@ -56,7 +56,7 @@ test("accepts only strict single-segment room IDs", () => {
 test("sanitizes, sorts, deduplicates, and caps the server room list", () => {
   const now = 10_000;
   const rooms: unknown[] = [
-    { ...MAIN_ROOM, name: "spoofed" },
+    { ...MAIN_ROOM, createdAt: 9_000, name: "Invalid main record" },
     { createdAt: 1_000, id: "older", name: "Older" },
     { createdAt: 9_000, id: "newest", name: "Newest" },
     { createdAt: 8_000, id: "another-id", name: "Mismatch" },
@@ -73,6 +73,15 @@ test("sanitizes, sorts, deduplicates, and caps the server room list", () => {
   assert.equal(visible[1].id, "newest");
   assert.equal(visible.some((room) => room.id === "invalid"), false);
   assert.equal(visible.length, MAX_PUBLIC_ROOMS);
+});
+
+test("a renamed Main room keeps its permanent identity and first position", () => {
+    const renamed = { ...MAIN_ROOM, name: "Living room" };
+    const listing = createPublicRoomListing(renamed, 3);
+    assert.deepEqual(getPublicRooms([renamed])[0], renamed);
+    assert.deepEqual(getPublicRoomListings([listing])[0], listing);
+    assert.equal(getRoomHref(renamed), "/rooms/main");
+    assert.equal(getPlayHtmlRoomForPath(getRoomHref(renamed)), PLAYHTML_LEGACY_MAIN_ROOM);
 });
 
 test("accepts only complete server room records", () => {
