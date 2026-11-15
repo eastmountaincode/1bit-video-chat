@@ -14,11 +14,13 @@ import type { GrayscaleFrame } from "@/lib/shared-types";
 interface GrayscaleCanvasProps {
   frame: GrayscaleFrame | null;
   renderWhenOffscreen?: boolean;
+    videoSide?: "own" | "other";
 }
 
 export const GrayscaleCanvas = memo(function GrayscaleCanvas({
   frame,
   renderWhenOffscreen = false,
+    videoSide,
 }: GrayscaleCanvasProps) {
   const frameRef = useRef<HTMLDivElement>(null);
   const backingCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -108,6 +110,7 @@ export const GrayscaleCanvas = memo(function GrayscaleCanvas({
       aria-label="Low-resolution grayscale camera image"
       className="grayscale-canvas"
       data-room-part="video-frame"
+      data-video-side={videoSide}
       ref={frameRef}
       role="img"
     >

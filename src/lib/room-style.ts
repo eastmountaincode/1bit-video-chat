@@ -7,7 +7,12 @@ export const MAX_ROOM_CSS_LENGTH = 20_000;
 export const ROOM_STYLE_COMMENTS_VERSION = 1;
 export const ROOM_STYLE_TEMPLATE_VERSION = 1;
 // Keep templateVersion at 1 for open clients that check it for exact equality.
-export const ROOM_STYLE_TEMPLATE_REVISION = 2;
+export const ROOM_STYLE_TEMPLATE_REVISION = 3;
+
+const OWN_VIDEO_STYLE_TARGETS = [
+    '[data-room-part="video-caption"][data-video-side="own"]',
+    '[data-room-part="video-rate"][data-video-side="own"]',
+] as const;
 
 export const ROOM_STYLE_TARGETS = [
   '[data-room-part="room"]',
@@ -20,6 +25,7 @@ export const ROOM_STYLE_TARGETS = [
   '[data-room-part="video-frame"]',
   '[data-room-part="video-caption"]',
   '[data-room-part="video-rate"]',
+    ...OWN_VIDEO_STYLE_TARGETS,
   '[data-room-part="leave"]',
   '[data-room-part="divider"]',
   '[data-room-part="sidebar"]',
@@ -42,7 +48,7 @@ export const DEFAULT_ROOM_STYLE_TARGETS = [
     '[data-room-part="title"]',
     '[data-room-part="video-field"]',
     '[data-room-part="video-card"]',
-    '[data-room-part="video-caption"]',
+    ...OWN_VIDEO_STYLE_TARGETS,
     '[data-room-part="chat"]',
     '[data-room-part="message"][data-message-side="own"]',
     '[data-room-part="message"][data-message-side="other"]',
@@ -73,6 +79,8 @@ const ROOM_STYLE_COMMENTS: Record<(typeof ROOM_STYLE_TARGETS)[number], string> =
     '[data-room-part="video-frame"]': "The video image.",
     '[data-room-part="video-caption"]': "The name below each video.",
     '[data-room-part="video-rate"]': "The data rate below each video.",
+    '[data-room-part="video-caption"][data-video-side="own"]': "The name below your own video.",
+    '[data-room-part="video-rate"][data-video-side="own"]': "The data rate below your own video.",
     '[data-room-part="leave"]': "The leave room button.",
     '[data-room-part="divider"]': "The draggable line between the two sides.",
     '[data-room-part="sidebar"]': "The chat and controls side.",
@@ -95,7 +103,8 @@ function roomStyleBlock(selector: (typeof ROOM_STYLE_TARGETS)[number]) {
 }
 
 export const ROOM_STYLE_SCAFFOLD = DEFAULT_ROOM_STYLE_TARGETS.map(roomStyleBlock).join("\n\n");
-const ORIGINAL_SCAFFOLD = ROOM_STYLE_TARGETS.filter((selector) => !NEW_CHAT_TARGETS.includes(selector))
+const ORIGINAL_SCAFFOLD = ROOM_STYLE_TARGETS.filter((selector) =>
+    !NEW_CHAT_TARGETS.includes(selector) && !(OWN_VIDEO_STYLE_TARGETS as readonly string[]).includes(selector))
     .map((selector) => `${selector}{}`).join("");
 
 export function migrateRoomStyleCss(css: string, commentsVersion?: number, templateRevision?: number): string {
@@ -118,6 +127,7 @@ function simplifyRoomStyleTemplate(css: string, addChatTargets: boolean): string
     let quote = "";
     const stack: { start: number; open: number; selector: string; leading: string }[] = [];
     let hasChat = false;
+    let hasVideoCaption = false;
     for (let index = 0; index < css.length; index += 1) {
         const character = css[index];
         if (quote) {
@@ -143,6 +153,7 @@ function simplifyRoomStyleTemplate(css: string, addChatTargets: boolean): string
             const leading = /^(?:\s|\/\*[\s\S]*?\*\/)*/.exec(segment)?.[0] ?? "";
             const selector = segment.slice(leading.length).trim();
             if (selector === '[data-room-part="chat"]' || selector.startsWith('[data-room-part="message"]')) hasChat = true;
+            if (selector.startsWith('[data-room-part="video-caption"]')) hasVideoCaption = true;
             stack.push({ start: boundary, open: index, selector, leading });
             boundary = index + 1;
         } else if (character === "}") {
@@ -160,12 +171,14 @@ function simplifyRoomStyleTemplate(css: string, addChatTargets: boolean): string
         if (result.length + text.length - (end - start) > MAX_ROOM_CSS_LENGTH) continue;
         result = result.slice(0, start) + text + result.slice(end);
     }
-    if (hasChat && addChatTargets) {
-        for (const selector of NEW_CHAT_TARGETS.filter((target) => defaults.includes(target))) {
-            if (hasSelectorBlock(result, selector)) continue;
-            const block = `\n\n${roomStyleBlock(selector)}`;
-            if (result.length + block.length <= MAX_ROOM_CSS_LENGTH) result += block;
-        }
+    const additions = [
+        ...(hasChat && addChatTargets ? NEW_CHAT_TARGETS.filter((target) => defaults.includes(target)) : []),
+        ...(hasVideoCaption ? OWN_VIDEO_STYLE_TARGETS : []),
+    ];
+    for (const selector of additions) {
+        if (hasSelectorBlock(result, selector)) continue;
+        const block = `\n\n${roomStyleBlock(selector)}`;
+        if (result.length + block.length <= MAX_ROOM_CSS_LENGTH) result += block;
     }
     return result;
 }

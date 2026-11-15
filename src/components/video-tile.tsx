@@ -156,9 +156,14 @@ export const VideoTile = memo(function VideoTile({
       <GrayscaleCanvas
         frame={frame}
         renderWhenOffscreen={renderWhenOffscreen}
+        videoSide={isMe ? "own" : "other"}
       />
       <figcaption>
-        <span className="video-caption-name" data-room-part="video-caption">
+        <span
+            className="video-caption-name"
+            data-room-part="video-caption"
+            data-video-side={isMe ? "own" : "other"}
+        >
           {name}
           {isMe ? " (you)" : ""}
         </span>
@@ -167,6 +172,7 @@ export const VideoTile = memo(function VideoTile({
           className="video-rate"
           data-rate-kind="encoded-video-payload"
           data-room-part="video-rate"
+          data-video-side={isMe ? "own" : "other"}
           title="Encoded video payload rate. PlayHTML transport overhead is not included."
         >
           {rateLabel.visible}

@@ -26,7 +26,8 @@ import {
 } from "./shared-text-entries.ts";
 
 test("simplifies the old default template while preserving customized declarations", () => {
-    const original = ROOM_STYLE_TARGETS.filter((selector) => !/message-(author|time|text)/.test(selector))
+    const original = ROOM_STYLE_TARGETS.filter((selector) =>
+        !/message-(author|time|text)|video-(caption|rate)"\]\[data-video-side/.test(selector))
         .map((selector) => `${selector} {\n  \n}`).join("\n\n");
     assert.equal(migrateRoomStyleCss(original), ROOM_STYLE_SCAFFOLD);
     const customized = original.replace('[data-room-part="room"] {', '[data-room-part="room"] { color: red;');
@@ -78,7 +79,7 @@ test("scaffolding does not truncate custom CSS to make room for default sections
     const css = `body { --value: "${"x".repeat(MAX_ROOM_CSS_LENGTH - 23)}"; }`;
     assert.ok(css.length <= MAX_ROOM_CSS_LENGTH);
     assert.equal(ensureRoomStyleScaffold(css), css);
-    assert.equal(DEFAULT_ROOM_STYLE_TARGETS.length, 10);
+    assert.equal(DEFAULT_ROOM_STYLE_TARGETS.length, 11);
 });
 
 test("simplifies existing defaults without removing custom grid or message text styles", () => {
@@ -107,6 +108,32 @@ test("keeps deliberate v4 CSS deletion and replacement intact", () => {
     normalizeCollaborativeRoomStyleCss("body { color: red; }", 4),
     "body { color: red; }",
   );
+});
+
+test("adds own video examples without narrowing existing styles for everyone", () => {
+    const css = '/* The name below each video. */\n[data-room-part="video-caption"] { color: red; }';
+    const migrated = migrateRoomStyleCss(css, 1, 2);
+    assert.ok(migrated.startsWith(css));
+    assert.match(migrated, /\[data-room-part="video-caption"\]\[data-video-side="own"\]/);
+    assert.match(migrated, /\[data-room-part="video-rate"\]\[data-video-side="own"\]/);
+    assert.equal(migrateRoomStyleCss(migrated, 1, ROOM_STYLE_TEMPLATE_REVISION), migrated);
+
+    const empty = '/* The name below each video. */\n[data-room-part="video-caption"] {}';
+    const updated = migrateRoomStyleCss(empty, 1, 2);
+    assert.doesNotMatch(updated, /\[data-room-part="video-caption"\]\s*\{/);
+    assert.doesNotMatch(updated, /The name below each video/);
+    assert.match(updated, /The name below your own video/);
+});
+
+test("keeps ad hoc ownership rules and deliberate removal of the own condition", () => {
+    const css = '[data-room-part="message-author"][data-message-side="own"] { color: red; }\n' +
+        '[data-room-part="message-time"][data-message-side="other"] { color: blue; }\n' +
+        '[data-room-part="video-caption"] { font-size: 2em; }\n' +
+        '.my-custom-selector { outline: 1px solid pink; }';
+    assert.equal(migrateRoomStyleCss(css, 1, ROOM_STYLE_TEMPLATE_REVISION), css);
+    assert.equal(normalizeCollaborativeRoomStyleCss(css, 4), css);
+    const full = css.padEnd(MAX_ROOM_CSS_LENGTH, ' ');
+    assert.equal(migrateRoomStyleCss(full, 1, 2), full);
 });
 
 test("repairs legacy CSS once and only caps current CSS", () => {
