@@ -1,9 +1,10 @@
 "use client";
 
 import { usePageData, usePlayContext } from "@playhtml/react";
-import { memo, useEffect, useRef, useState, type FormEvent } from "react";
+import { memo, useEffect, useRef, useState, type FormEvent, type PointerEvent } from "react";
 
 import { useMobileLayout } from "@/hooks/use-mobile-layout";
+import { useMobileChatViewport } from "@/hooks/use-mobile-chat-viewport";
 import { usePageScrollLock } from "@/hooks/use-page-scroll-lock";
 import type { ChatLedger } from "@/lib/shared-types";
 
@@ -27,8 +28,21 @@ export const ChatPanel = memo(function ChatPanel({ active, name, ownerId }: Chat
   const isMobile = useMobileLayout();
   const isVisible = isMobile ? isOpen : active;
   const listRef = useRef<HTMLOListElement>(null);
+    const panelRef = useRef<HTMLElement>(null);
+    const inputRef = useRef<HTMLInputElement>(null);
 
     usePageScrollLock(isMobile && isOpen);
+    useMobileChatViewport(panelRef, isMobile);
+
+    function keepInputFocus(event: PointerEvent<HTMLButtonElement>) {
+        // Keep the keyboard from moving a tapped control before its click arrives.
+        if (isMobile && document.activeElement === inputRef.current) event.preventDefault();
+    }
+
+    function toggleChat() {
+        if (isOpen) inputRef.current?.blur();
+        setIsOpen((open) => !open);
+    }
 
   useEffect(() => {
     if (isVisible) {
@@ -70,6 +84,7 @@ export const ChatPanel = memo(function ChatPanel({ active, name, ownerId }: Chat
           maxLength={500}
           onChange={(event) => setMessage(event.target.value)}
           placeholder="type message..."
+          ref={inputRef}
           type="text"
           value={message}
         />
@@ -87,6 +102,7 @@ export const ChatPanel = memo(function ChatPanel({ active, name, ownerId }: Chat
         aria-label={isMobile ? "Send message" : undefined}
         className="chat-submit-button"
         disabled={isLoading || message.trim().length === 0}
+        onPointerDown={keepInputFocus}
         type="submit"
       >
         {isMobile ? (
@@ -107,7 +123,7 @@ export const ChatPanel = memo(function ChatPanel({ active, name, ownerId }: Chat
   );
 
   return (
-    <section className={`chat-panel${isOpen ? " chat-open" : ""}`}>
+    <section className={`chat-panel${isOpen ? " chat-open" : ""}`} ref={panelRef}>
       <div className="chat-drawer" hidden={!isVisible} id="chat-drawer">
         <fieldset className="chat-fieldset" data-room-part="chat">
           <legend>chat</legend>
@@ -163,7 +179,8 @@ export const ChatPanel = memo(function ChatPanel({ active, name, ownerId }: Chat
           aria-expanded={isVisible}
           aria-label={isOpen ? "Close chat" : "Open chat"}
           className="chat-toggle-button"
-          onClick={() => setIsOpen((open) => !open)}
+          onClick={toggleChat}
+          onPointerDown={keepInputFocus}
           type="button"
         >
           chat

@@ -680,8 +680,21 @@ legend {
   }
 
   .chat-panel {
+    bottom: var(--chat-viewport-bottom, 0px);
     height: auto;
+    position: fixed;
+    right: 0;
+    width: 5rem;
+    z-index: 52;
   }
+
+    .chat-panel.chat-open {
+        display: grid;
+        grid-template-rows: minmax(0, 1fr) auto;
+        height: min(calc(65svh + 2.75rem), var(--chat-viewport-height, 100dvh));
+        left: 0;
+        width: auto;
+    }
 
     .chat-open .message-list {
         overscroll-behavior-y: contain;
@@ -691,16 +704,8 @@ legend {
     align-items: stretch;
     background: var(--background);
     border-top: 1px solid #000000;
-    bottom: 0;
     display: flex;
     justify-content: flex-end;
-    position: fixed;
-    right: 0;
-    z-index: 52;
-  }
-
-  .chat-open .chat-control-bar {
-    left: 0;
   }
 
   .chat-panel:not(.chat-open) .chat-control-bar {
@@ -719,13 +724,9 @@ legend {
   .chat-drawer {
     background: var(--background);
     border-top: 1px solid #000000;
-    bottom: 2.75rem;
-    height: 65svh;
-    left: 0;
+    height: auto;
     padding: 0;
-    position: fixed;
-    right: 0;
-    z-index: 51;
+    position: relative;
   }
 
   .chat-fieldset {
