@@ -1,14 +1,21 @@
 import type { CollaborativeCodeDocument } from "./collaborative-code.ts";
 import { createTextEntries, readTextEntries, mergeTextEntrySplices, mapSelectionByIdentity, type SharedTextMerge } from "./shared-text-entries.ts";
 
-import { computeTextSplice, type TextSelection, type TextSplice } from "./collaborative-text.ts";
+import { type TextSelection, type TextSplice } from "./collaborative-text.ts";
+import { mergeEntryChanges } from "./code-editor-history.ts";
 
 export const OWNED_ROOM_STYLE_CHANNEL = "room-style:v3";
 export const MAX_STORED_ROOM_CSS_LENGTH = 400_000;
 
 interface Ownership {
     template: string;
-    people: Record<string, { entries: string[] }>;
+    templateLayout?: { index: number; left: string | null; right: string | null }[];
+    people: Record<string, { entries: string[]; anchors?: Record<string, StyleAnchor> }>;
+}
+
+interface StyleAnchor {
+    left: string | null;
+    right: string | null;
 }
 
 export interface OwnedStyleDocument extends CollaborativeCodeDocument {
@@ -64,17 +71,61 @@ export function prepareOwnedStyle(document: OwnedStyleDocument, owner: string, p
     }
     if (!document.ownership) {
         const parts = partition(document.entries);
-        document.ownership = { template: readTextEntries(parts.personal), people: {} };
+        const anchors = personalAnchors(document.entries, new Set(parts.personal));
+        document.ownership = {
+            template: readTextEntries(parts.personal),
+            templateLayout: Object.entries(anchors).map(([entry, anchor]) => ({ index: parts.personal.indexOf(entry), ...anchor })),
+            people: {},
+        };
         document.entries = parts.shared;
     }
     if (hasOwnedStyle(document, owner)) return;
     const used = document.entries.length + Object.values(document.ownership.people).reduce((total, person) => total + person.entries.length, 0);
     const template = used + document.ownership.template.length <= MAX_STORED_ROOM_CSS_LENGTH ? document.ownership.template : "";
-    document.ownership.people[owner] = { entries: createTextEntries(template, prefix()) };
+    const entries = createTextEntries(template, prefix());
+    document.ownership.people[owner] = {
+        entries,
+        anchors: Object.fromEntries((document.ownership.templateLayout ?? [])
+            .filter((anchor) => anchor.index < entries.length)
+            .map(({ index, left, right }) => [entries[index], { left, right }])),
+    };
 }
 
 export function projectOwnedStyle(document: OwnedStyleDocument, owner: string): string[] {
-    return [...document.entries, ...(document.ownership?.people[owner]?.entries ?? [])];
+    const person = document.ownership?.people[owner];
+    if (!person?.anchors) return [...document.entries, ...(person?.entries ?? [])];
+    const sharedPositions = new Map(document.entries.map((entry, index) => [entry, index]));
+    const groups = new Map<number, string[]>();
+    let position = document.entries.length;
+    for (const entry of person.entries) {
+        const anchor = person.anchors[entry];
+        if (anchor) {
+            const right = anchor.right === null ? undefined : sharedPositions.get(anchor.right);
+            const left = anchor.left === null ? undefined : sharedPositions.get(anchor.left);
+            position = right ?? (left === undefined ? document.entries.length : left + 1);
+        }
+        const group = groups.get(position) ?? [];
+        group.push(entry);
+        groups.set(position, group);
+    }
+    const entries: string[] = [];
+    for (let index = 0; index <= document.entries.length; index += 1) {
+        entries.push(...(groups.get(index) ?? []));
+        if (index < document.entries.length) entries.push(document.entries[index]);
+    }
+    return entries;
+}
+
+function personalAnchors(entries: string[], personal: Set<string>): Record<string, StyleAnchor> {
+    const anchors: Record<string, StyleAnchor> = {};
+    let left: string | null = null;
+    for (let index = 0; index < entries.length;) {
+        if (!personal.has(entries[index])) { left = entries[index++]; continue; }
+        const first = entries[index];
+        while (index < entries.length && personal.has(entries[index])) index += 1;
+        anchors[first] = { left, right: entries[index] ?? null };
+    }
+    return anchors;
 }
 
 export function mergeOwnedStyle(
@@ -86,42 +137,49 @@ export function mergeOwnedStyle(
     prefix: () => string,
     maxLength: number,
 ): SharedTextMerge {
+    const visible = projectOwnedStyle(document, owner);
+    const result = mergeTextEntrySplices(base, visible, splices, selection, prefix, maxLength);
+    return applyOwnedStyleEntries(document, owner, result.entries, result.selection, maxLength);
+}
+
+// Keep the editor order separate from storage grouping. Original character IDs
+// survive scope changes and undo, so concurrent edits still target the same text.
+export function applyOwnedStyleEntries(
+    document: OwnedStyleDocument,
+    owner: string,
+    desired: string[],
+    selection: TextSelection,
+    maxLength: number,
+): SharedTextMerge {
     const person = document.ownership?.people[owner];
     const visible = projectOwnedStyle(document, owner);
     if (!person) return { accepted: false, entries: visible, operations: [], selection, text: readTextEntries(visible) };
-    const intended = mergeTextEntrySplices(base, base, splices, selection, prefix, maxLength);
-    const before = partition(base);
-    const after = partition(intended.entries);
-    const combined = [...after.shared, ...after.personal];
-    // A local edit's caret belongs after the text just typed or pasted, even
-    // when that rule moves away from the next shared rule during partitioning.
-    const position = mapSelectionByIdentity(intended.entries, combined, intended.selection, "left");
-    const boundary = after.shared.length;
-    const sharedSelection = { ...position, start: Math.min(position.start, boundary), end: Math.min(position.end, boundary) };
-    const personalSelection = { ...position, start: Math.max(0, position.start - boundary), end: Math.max(0, position.end - boundary) };
-    // Merge the two text arrays independently so a paste cannot overwrite another writer's CSS.
-    function merge(previous: string[], next: string[], live: string[], selected: TextSelection) {
-        const splice = computeTextSplice(readTextEntries(previous), readTextEntries(next));
-        return mergeTextEntrySplices(previous, live, splice ? [splice] : [], selected, prefix, maxLength);
-    }
-    const shared = merge(before.shared, after.shared, document.entries, sharedSelection);
-    const personal = merge(before.personal, after.personal, person.entries, personalSelection);
+    const after = partition(desired);
     const otherLength = Object.entries(document.ownership!.people).reduce((total, [id, value]) => total + (id === owner ? 0 : value.entries.length), 0);
-    if (shared.entries.length + personal.entries.length + otherLength > MAX_STORED_ROOM_CSS_LENGTH) {
-        return { accepted: false, entries: visible, operations: [], selection: mapSelectionByIdentity(base, visible, selection), text: readTextEntries(visible) };
+    if (desired.length > maxLength || desired.length + otherLength > MAX_STORED_ROOM_CSS_LENGTH) {
+        return { accepted: false, entries: visible, operations: [], selection: mapSelectionByIdentity(desired, visible, selection), text: readTextEntries(visible) };
     }
+    const shared = mergeEntryChanges(document.entries, after.shared, document.entries);
+    const personal = mergeEntryChanges(person.entries, after.personal, person.entries);
     for (const operation of shared.operations) document.entries.splice(operation.index, operation.deleteCount, ...operation.insert);
     for (const operation of personal.operations) person.entries.splice(operation.index, operation.deleteCount, ...operation.insert);
-    const entries = [...shared.entries, ...personal.entries];
+    const anchors = personalAnchors(desired, new Set(after.personal));
+    person.anchors ??= {};
+    // Update individual anchors so simultaneous tabs do not replace each
+    // other's newly inserted positions with an older copy of the whole map.
+    for (const entry of Object.keys(person.anchors)) {
+        if (!anchors[entry]) delete person.anchors[entry];
+    }
+    for (const [entry, anchor] of Object.entries(anchors)) {
+        const previous = person.anchors[entry];
+        if (!previous || previous.left !== anchor.left || previous.right !== anchor.right) person.anchors[entry] = anchor;
+    }
+    const entries = projectOwnedStyle(document, owner);
     return {
         accepted: true,
         entries,
         operations: [...shared.operations, ...personal.operations],
-        selection: {
-            direction: position.direction,
-            start: position.start <= boundary ? shared.selection.start : shared.entries.length + personal.selection.start,
-            end: position.end <= boundary ? shared.selection.end : shared.entries.length + personal.selection.end,
-        },
+        selection: mapSelectionByIdentity(desired, entries, selection),
         text: readTextEntries(entries),
     };
 }

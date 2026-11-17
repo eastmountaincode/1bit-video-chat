@@ -5,7 +5,8 @@ import * as Y from "yjs";
 
 import { createCollaborativeCodeDocument } from "./collaborative-code.ts";
 import { computeTextSplice } from "./collaborative-text.ts";
-import { mergeOwnedStyle, hasOwnedStyle, MAX_STORED_ROOM_CSS_LENGTH, normalizeRoomStyleSelectors, prepareOwnedStyle, projectOwnedStyle, renderOwnedStyles, styleOwnerId, type OwnedStyleDocument } from "./owned-room-style.ts";
+import { mergeOwnedStyle, applyOwnedStyleEntries, hasOwnedStyle, MAX_STORED_ROOM_CSS_LENGTH, normalizeRoomStyleSelectors, prepareOwnedStyle, projectOwnedStyle, renderOwnedStyles, styleOwnerId, type OwnedStyleDocument } from "./owned-room-style.ts";
+import { CodeEditorHistory } from "./code-editor-history.ts";
 import { createTextEntries, readTextEntries } from "./shared-text-entries.ts";
 import { ROOM_STYLE_SCAFFOLD } from "./room-style.ts";
 
@@ -45,10 +46,102 @@ test("after reset, pasting an owned video rule keeps the caret after the pasted 
             const caret = index + insert.length;
             const result = mergeOwnedStyle(doc, alice, base, [{ index, deleteCount: 0, insert }],
                 { start: caret, end: caret, direction: "none" }, prefix, 20_000);
+            assert.equal(result.text, text.slice(0, index) + insert + text.slice(index));
+            assert.equal(result.selection.start, caret);
             assert.equal(result.text.slice(result.selection.start - insert.length, result.selection.start), insert, `${place}: ${JSON.stringify(trailing)}`);
             assert.equal(result.selection.start, result.selection.end);
         }
     }
+});
+
+test("mixed shared and personal rule order survives reload and scope edits", () => {
+    const css = 'body { color: red; }\n[data-side="own"] { color: blue; }\nfooter { color: green; }\n[data-side="other"] { color: gray; }';
+    const doc = document(css);
+    prepareOwnedStyle(doc, alice, prefix);
+    assert.equal(readTextEntries(projectOwnedStyle(doc, alice)), css);
+    const restored = JSON.parse(JSON.stringify(doc));
+    assert.equal(readTextEntries(projectOwnedStyle(restored, alice)), css);
+    const base = projectOwnedStyle(doc, alice);
+    edit(doc, alice, base, css.replace('[data-side="own"]', '[data-room-part="video-frame"]'));
+    assert.equal(readTextEntries(projectOwnedStyle(doc, alice)), css.replace('[data-side="own"]', '[data-room-part="video-frame"]'));
+    prepareOwnedStyle(doc, bob, prefix);
+    assert.ok(readTextEntries(projectOwnedStyle(doc, bob)).includes('[data-room-part="video-frame"]'));
+});
+
+test("two tabs for the same writer retain both personal insertion positions", () => {
+    const aDoc = new Y.Doc();
+    const bDoc = new Y.Doc();
+    const a = syncedStore({ state: {} as { current: OwnedStyleDocument } }, aDoc);
+    const b = syncedStore({ state: {} as { current: OwnedStyleDocument } }, bDoc);
+    const seed = document(ROOM_STYLE_SCAFFOLD);
+    prepareOwnedStyle(seed, alice, prefix);
+    a.state.current = seed;
+    Y.applyUpdate(bDoc, Y.encodeStateAsUpdate(aDoc));
+    const first = '[data-side="own"] { --first: 1; }\n';
+    const middle = '[data-side="own"] { --middle: 1; }\n';
+    const before = projectOwnedStyle(a.state.current!, alice);
+    const secondBefore = projectOwnedStyle(b.state.current!, alice);
+    const middleIndex = readTextEntries(secondBefore).indexOf('/* The chat panel. */');
+    mergeOwnedStyle(a.state.current!, alice, before, [{ index: 0, deleteCount: 0, insert: first }],
+        { start: first.length, end: first.length }, prefix, 20_000);
+    mergeOwnedStyle(b.state.current!, alice, secondBefore, [{ index: middleIndex, deleteCount: 0, insert: middle }],
+        { start: middleIndex + middle.length, end: middleIndex + middle.length }, prefix, 20_000);
+    const au = Y.encodeStateAsUpdate(aDoc);
+    const bu = Y.encodeStateAsUpdate(bDoc);
+    Y.applyUpdate(aDoc, bu);
+    Y.applyUpdate(bDoc, au);
+    for (const doc of [a.state.current!, b.state.current!]) {
+        const css = readTextEntries(projectOwnedStyle(doc, alice));
+        assert.ok(css.startsWith(first));
+        assert.ok(css.includes(middle + '/* The chat panel. */'));
+    }
+    assert.deepEqual(projectOwnedStyle(a.state.current!, alice), projectOwnedStyle(b.state.current!, alice));
+    aDoc.destroy();
+    bDoc.destroy();
+});
+
+test("undo and redo of a personal paste converge over Yjs and retain another writer's room edit", () => {
+    const aDoc = new Y.Doc();
+    const bDoc = new Y.Doc();
+    const a = syncedStore({ state: {} as { current: OwnedStyleDocument } }, aDoc);
+    const b = syncedStore({ state: {} as { current: OwnedStyleDocument } }, bDoc);
+    const seed = document(ROOM_STYLE_SCAFFOLD);
+    prepareOwnedStyle(seed, alice, prefix);
+    prepareOwnedStyle(seed, bob, prefix);
+    a.state.current = seed;
+    Y.applyUpdate(bDoc, Y.encodeStateAsUpdate(aDoc));
+    const history = new CodeEditorHistory();
+    const before = projectOwnedStyle(a.state.current!, alice);
+    const insert = '[data-room-part="video-frame"][data-side="own"] { height: 80px; }\n';
+    const result = mergeOwnedStyle(a.state.current!, alice, before, [{ index: 0, deleteCount: 0, insert }],
+        { start: insert.length, end: insert.length }, prefix, 20_000);
+    history.record(before, result.entries, { start: 0, end: 0 }, result.selection);
+    const bobBefore = projectOwnedStyle(b.state.current!, bob);
+    edit(b.state.current!, bob, bobBefore, readTextEntries(bobBefore).replace('[data-room-part="title"] {', '[data-room-part="title"] { color: blue;'));
+    function sync() {
+        const au = Y.encodeStateAsUpdate(aDoc);
+        const bu = Y.encodeStateAsUpdate(bDoc);
+        Y.applyUpdate(aDoc, bu);
+        Y.applyUpdate(bDoc, au);
+    }
+    sync();
+    for (const direction of ["undo", "redo", "undo", "redo"] as const) {
+        const live = projectOwnedStyle(a.state.current!, alice);
+        const plan = history.plan(direction, live, 20_000, prefix);
+        assert.ok(plan);
+        const applied = applyOwnedStyleEntries(a.state.current!, alice, plan.entries, plan.selection, 20_000);
+        assert.ok(applied.accepted);
+        history.complete(direction, plan.replacements);
+        sync();
+        assert.equal(renderOwnedStyle(a.state.current!), renderOwnedStyle(b.state.current!));
+        for (const doc of [a.state.current!, b.state.current!]) {
+            const css = readTextEntries(projectOwnedStyle(doc, alice));
+            assert.ok(css.includes('[data-room-part="title"] { color: blue;'));
+            assert.equal(css.startsWith(insert), direction === "redo");
+        }
+    }
+    aDoc.destroy();
+    bDoc.destroy();
 });
 
 test("a paste follows its last rule while preserving a concurrent room edit", () => {

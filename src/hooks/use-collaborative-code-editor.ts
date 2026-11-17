@@ -19,6 +19,7 @@ import {
     type CollaborativeCodeDocument,
 } from "@/lib/collaborative-code";
 import { getCodeEditorShortcut } from "@/lib/code-editor-shortcut";
+import { CodeEditorHistory, type HistoryDirection } from "@/lib/code-editor-history";
 import {
   computeTextSplice,
   type TextSelection,
@@ -43,6 +44,7 @@ export interface CodeDocumentAdapter {
     ready: (document: CollaborativeCodeDocument) => boolean;
     project: (document: CollaborativeCodeDocument) => string[];
     merge: (document: CollaborativeCodeDocument, base: string[], splices: TextSplice[], selection: TextSelection, prefix: () => string, maxLength: number) => SharedTextMerge;
+    applyEntries: (document: CollaborativeCodeDocument, entries: string[], selection: TextSelection, maxLength: number) => SharedTextMerge;
 }
 
 interface CollaborativeCodeEditorOptions {
@@ -152,6 +154,9 @@ export function useCollaborativeCodeEditor({
   const compositionBaseRef = useRef(initialCode);
   const compositionFinalValueRef = useRef<string | null>(null);
   const allowNextTabToLeaveRef = useRef(false);
+    const historyRef = useRef(new CodeEditorHistory());
+    const beforeInputSelectionRef = useRef<TextSelection | null>(null);
+    const compositionSelectionRef = useRef<TextSelection>({ start: 0, end: 0, direction: "none" });
 
   function updateEditor(
     value: string,
@@ -264,6 +269,10 @@ export function useCollaborativeCodeEditor({
     }
 
     const previousEntries = editorEntriesRef.current;
+    if (documentIdRef.current !== currentDocumentId) historyRef.current.clear();
+    else if (previousEntries.length !== editorSharedEntries.length || previousEntries.some((entry, index) => entry !== editorSharedEntries[index])) {
+        historyRef.current.breakGroup();
+    }
     const textarea = textareaRef.current;
     const focusedSelection =
       textarea && document.activeElement === textarea
@@ -318,6 +327,8 @@ export function useCollaborativeCodeEditor({
     before: string,
     localSplices: TextSplice[],
     selection: TextSelection,
+    historyGroup: string | null = null,
+    previousSelection: TextSelection = selectionRef.current,
   ) {
     let result: SharedTextMerge = {
       accepted: false,
@@ -327,6 +338,8 @@ export function useCollaborativeCodeEditor({
       text: before,
     };
     if (controlsDisabled || !currentDocumentIsEditable || !adapterReady) return result;
+    let historyBefore: string[] | null = null;
+    let historySelection = previousSelection;
 
     setSharedDocument((draft) => {
       const liveDocument = draft.current;
@@ -354,6 +367,7 @@ export function useCollaborativeCodeEditor({
       ) {
         const documentEpochMatches =
           liveDocumentId === documentIdRef.current;
+        if (!documentEpochMatches) historyRef.current.clear();
         documentIdRef.current = liveDocumentId;
         result = {
           accepted: false,
@@ -371,6 +385,9 @@ export function useCollaborativeCodeEditor({
         };
         return;
       }
+
+      historyBefore = [...visibleEntries];
+      historySelection = mapSelectionByIdentity(editorEntriesRef.current, visibleEntries, previousSelection);
 
       if (documentAdapter) {
           result = documentAdapter.merge(liveDocument, editorEntriesRef.current, localSplices, selection, createEntryPrefix, maxLength);
@@ -407,6 +424,9 @@ export function useCollaborativeCodeEditor({
 
     });
 
+    if (result.accepted && result.operations.length && historyBefore) {
+        historyRef.current.record(historyBefore, result.entries, historySelection, result.selection, historyGroup);
+    }
     return result;
   }
 
@@ -414,12 +434,16 @@ export function useCollaborativeCodeEditor({
     before: string,
     after: string,
     selection: TextSelection,
+    historyGroup: string | null = null,
+    previousSelection: TextSelection = selectionRef.current,
   ) {
     const localSplice = computeTextSplice(before, after);
     return commitSplices(
       before,
       localSplice ? [localSplice] : [],
       selection,
+      historyGroup,
+      previousSelection,
     );
   }
 
@@ -456,6 +480,7 @@ export function useCollaborativeCodeEditor({
             draft.version = 1;
         });
         documentIdRef.current = next.id;
+        historyRef.current.clear();
         compositionFinalValueRef.current = null;
         pendingCaretRevealRef.current = false;
         const entries = documentAdapter ? documentAdapter.project(next) : next.entries;
@@ -464,6 +489,11 @@ export function useCollaborativeCodeEditor({
     }
 
   function handleChange(event: ChangeEvent<HTMLTextAreaElement>) {
+    const inputType = (event.nativeEvent as InputEvent).inputType;
+    if (inputType === "historyUndo" || inputType === "historyRedo") {
+        applyHistory(inputType === "historyUndo" ? "undo" : "redo");
+        return;
+    }
     const nextValue = event.currentTarget.value;
     const nextSelection = readSelection(event.currentTarget);
 
@@ -493,12 +523,16 @@ export function useCollaborativeCodeEditor({
       editorValueRef.current,
       nextValue,
       nextSelection,
+      ["insertText", "deleteContentBackward", "deleteContentForward"].includes(inputType) ? inputType : null,
+      beforeInputSelectionRef.current ?? selectionRef.current,
     );
+    beforeInputSelectionRef.current = null;
     pendingCaretRevealRef.current = result.text !== nextValue;
     updateEditor(result.text, result.entries, result.selection);
   }
 
   function handleKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
+    beforeInputSelectionRef.current = readSelection(event.currentTarget);
     const shortcut = getCodeEditorShortcut({
       altKey: event.altKey,
       code: event.code,
@@ -507,7 +541,14 @@ export function useCollaborativeCodeEditor({
         event.nativeEvent.isComposing || isComposingRef.current,
       key: event.key,
       metaKey: event.metaKey,
+      shiftKey: event.shiftKey,
     });
+
+    if (shortcut === "undo" || shortcut === "redo") {
+        event.preventDefault();
+        applyHistory(shortcut);
+        return;
+    }
 
     if (shortcut === "run" && onRunShortcut) {
       event.preventDefault();
@@ -589,10 +630,13 @@ export function useCollaborativeCodeEditor({
     isComposingRef.current = true;
     compositionBaseRef.current = editorValueRef.current;
     compositionFinalValueRef.current = null;
+    compositionSelectionRef.current = readSelection(textareaRef.current!);
+    historyRef.current.breakGroup();
   }
 
   function handleBlur() {
     allowNextTabToLeaveRef.current = false;
+    historyRef.current.breakGroup();
   }
 
   function handleCompositionEnd(event: CompositionEvent<HTMLTextAreaElement>) {
@@ -604,6 +648,8 @@ export function useCollaborativeCodeEditor({
       compositionBaseRef.current,
       composedValue,
       composedSelection,
+      null,
+      compositionSelectionRef.current,
     );
     compositionFinalValueRef.current = composedValue;
     pendingCaretRevealRef.current = result.text !== composedValue;
@@ -611,8 +657,55 @@ export function useCollaborativeCodeEditor({
   }
 
   function handleSelect(event: SyntheticEvent<HTMLTextAreaElement>) {
-    selectionRef.current = readSelection(event.currentTarget);
+    const selected = readSelection(event.currentTarget);
+    if (selected.start !== selectionRef.current.start || selected.end !== selectionRef.current.end) historyRef.current.breakGroup();
+    selectionRef.current = selected;
   }
+
+    function applyHistory(direction: HistoryDirection) {
+        if (controlsDisabled || !currentDocumentIsEditable || !adapterReady || isComposingRef.current) return;
+        compositionFinalValueRef.current = null;
+        let result: SharedTextMerge = {
+            accepted: false, entries: editorEntriesRef.current, operations: [],
+            text: editorValueRef.current, selection: selectionRef.current,
+        };
+        setSharedDocument((draft) => {
+            const live = draft.current;
+            if (!live || live.id !== documentIdRef.current) { historyRef.current.clear(); return; }
+            const entries = documentAdapter ? documentAdapter.project(live) : live.entries;
+            const plan = historyRef.current.plan(direction, entries, maxLength, createEntryPrefix);
+            if (!plan) return;
+            if (documentAdapter) {
+                result = documentAdapter.applyEntries(live, plan.entries, plan.selection, maxLength);
+            } else {
+                for (const operation of plan.operations) live.entries.splice(operation.index, operation.deleteCount, ...operation.insert);
+                result = { ...plan, accepted: true, text: readTextEntriesSafely(plan.entries, maxLength) ?? "" };
+            }
+            if (result.accepted) {
+                historyRef.current.complete(direction, plan.replacements);
+                draft.updatedAt = Date.now();
+                draft.updatedBy = name;
+                draft.version = 1;
+            }
+        });
+        pendingCaretRevealRef.current = result.accepted;
+        updateEditor(result.text, result.entries, result.selection);
+    }
+
+    // Native beforeinput also covers Edit-menu undo and mobile undo gestures.
+    useEffect(() => {
+        const textarea = textareaRef.current;
+        if (!textarea) return;
+        function beforeInput(event: InputEvent) {
+            beforeInputSelectionRef.current = readSelection(textarea!);
+            if (event.cancelable && (event.inputType === "historyUndo" || event.inputType === "historyRedo")) {
+                event.preventDefault();
+                applyHistory(event.inputType === "historyUndo" ? "undo" : "redo");
+            }
+        }
+        textarea.addEventListener("beforeinput", beforeInput);
+        return () => textarea.removeEventListener("beforeinput", beforeInput);
+    });
 
   return {
     controlsDisabled,

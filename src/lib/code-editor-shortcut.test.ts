@@ -12,6 +12,16 @@ const baseKeyboardEvent = {
   metaKey: false,
 };
 
+test("recognizes platform undo and redo shortcuts", () => {
+    for (const modifier of [{ ctrlKey: true }, { metaKey: true }]) {
+        assert.equal(getCodeEditorShortcut({ ...baseKeyboardEvent, ...modifier, key: "z", code: "KeyZ" }), "undo");
+        assert.equal(getCodeEditorShortcut({ ...baseKeyboardEvent, ...modifier, key: "Z", code: "KeyZ", shiftKey: true }), "redo");
+    }
+    assert.equal(getCodeEditorShortcut({ ...baseKeyboardEvent, ctrlKey: true, key: "y", code: "KeyY" }), "redo");
+    assert.equal(getCodeEditorShortcut({ ...baseKeyboardEvent, ctrlKey: true, key: "z", isComposing: true }), null);
+    assert.equal(getCodeEditorShortcut({ ...baseKeyboardEvent, ctrlKey: true, key: "z", altKey: true }), null);
+});
+
 test("recognizes Control and Command run shortcuts", () => {
   assert.equal(
     getCodeEditorShortcut({

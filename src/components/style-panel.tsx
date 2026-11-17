@@ -7,6 +7,7 @@ import { useCollaborativeCodeEditor, type CodeDocumentAdapter } from "@/hooks/us
 import { DEFAULT_COLLABORATIVE_CODE_DATA } from "@/lib/collaborative-code";
 import {
     mergeOwnedStyle,
+    applyOwnedStyleEntries,
     hasOwnedStyle,
     MAX_STORED_ROOM_CSS_LENGTH,
     OWNED_ROOM_STYLE_CHANNEL,
@@ -42,6 +43,7 @@ export const StylePanel = memo(function StylePanel({ active, name, ownerId }: St
         ready: (document) => hasOwnedStyle(document, ownerId),
         project: (document) => projectOwnedStyle(document, ownerId),
         merge: (document, base, splices, selection, prefix, maxLength) => mergeOwnedStyle(document, ownerId, base, splices, selection, prefix, maxLength),
+        applyEntries: (document, entries, selection, maxLength) => applyOwnedStyleEntries(document, ownerId, entries, selection, maxLength),
     }), [ownerId]);
     const editor = useCollaborativeCodeEditor({
         channelName: OWNED_ROOM_STYLE_CHANNEL,
