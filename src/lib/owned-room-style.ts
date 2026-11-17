@@ -40,9 +40,15 @@ function partition(entries: string[]) {
     const css = readTextEntries(entries);
     const shared: string[] = [];
     const personal: string[] = [];
+    let start = 0;
     for (const block of styleBlocks(css)) {
+        // Keep line breaks with the rule they follow, including trailing paste
+        // whitespace, so its caret does not move into a different ownership group.
+        let end = block.end;
+        while (end < css.length && /\s/.test(css[end])) end += 1;
         const target = block.tokens.length > 0 ? personal : shared;
-        for (let index = block.start; index < block.end; index += 1) target.push(entries[index]);
+        for (let index = start; index < end; index += 1) target.push(entries[index]);
+        start = end;
     }
     return { shared, personal };
 }
@@ -87,7 +93,9 @@ export function mergeOwnedStyle(
     const before = partition(base);
     const after = partition(intended.entries);
     const combined = [...after.shared, ...after.personal];
-    const position = mapSelectionByIdentity(intended.entries, combined, intended.selection);
+    // A local edit's caret belongs after the text just typed or pasted, even
+    // when that rule moves away from the next shared rule during partitioning.
+    const position = mapSelectionByIdentity(intended.entries, combined, intended.selection, "left");
     const boundary = after.shared.length;
     const sharedSelection = { ...position, start: Math.min(position.start, boundary), end: Math.min(position.end, boundary) };
     const personalSelection = { ...position, start: Math.max(0, position.start - boundary), end: Math.max(0, position.end - boundary) };

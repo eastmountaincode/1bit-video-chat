@@ -25,6 +25,7 @@ import {
   type TextSplice,
 } from "@/lib/collaborative-text";
 import { resolveEditorSelection } from "@/lib/editor-selection";
+import { revealTextareaCaret } from "@/lib/textarea-caret";
 import {
   mapSelectionByIdentity,
   mergeTextEntrySplices,
@@ -146,6 +147,7 @@ export function useCollaborativeCodeEditor({
     direction: "none",
   });
   const pendingSelectionRef = useRef<TextSelection | null>(null);
+    const pendingCaretRevealRef = useRef(false);
   const isComposingRef = useRef(false);
   const compositionBaseRef = useRef(initialCode);
   const compositionFinalValueRef = useRef<string | null>(null);
@@ -306,6 +308,10 @@ export function useCollaborativeCodeEditor({
       pendingSelection.end,
       pendingSelection.direction,
     );
+    if (pendingCaretRevealRef.current) {
+        pendingCaretRevealRef.current = false;
+        revealTextareaCaret(textarea);
+    }
   }, [editorValue, selectionRevision]);
 
   function commitSplices(
@@ -422,6 +428,7 @@ export function useCollaborativeCodeEditor({
 
     compositionFinalValueRef.current = null;
     const result = commitSplices(before, edit.splices, edit.selection);
+    pendingCaretRevealRef.current = result.text !== edit.value;
     updateEditor(result.text, result.entries, result.selection);
   }
 
@@ -450,6 +457,7 @@ export function useCollaborativeCodeEditor({
         });
         documentIdRef.current = next.id;
         compositionFinalValueRef.current = null;
+        pendingCaretRevealRef.current = false;
         const entries = documentAdapter ? documentAdapter.project(next) : next.entries;
         updateEditor(readTextEntriesSafely(entries, maxLength) ?? code, entries, { start: 0, end: 0, direction: "none" });
         if (textareaRef.current) textareaRef.current.scrollTop = 0;
@@ -486,6 +494,7 @@ export function useCollaborativeCodeEditor({
       nextValue,
       nextSelection,
     );
+    pendingCaretRevealRef.current = result.text !== nextValue;
     updateEditor(result.text, result.entries, result.selection);
   }
 
@@ -597,6 +606,7 @@ export function useCollaborativeCodeEditor({
       composedSelection,
     );
     compositionFinalValueRef.current = composedValue;
+    pendingCaretRevealRef.current = result.text !== composedValue;
     updateEditor(result.text, result.entries, result.selection);
   }
 

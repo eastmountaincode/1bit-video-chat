@@ -49,6 +49,7 @@ export const DEFAULT_ROOM_STYLE_TARGETS = [
     '[data-room-part="title"]',
     '[data-room-part="video-field"]',
     '[data-room-part="video-card"]',
+    '[data-room-part="video-frame"]',
     ...OWN_VIDEO_STYLE_TARGETS,
     '[data-room-part="chat"]',
     '[data-room-part="message"][data-side="own"]',

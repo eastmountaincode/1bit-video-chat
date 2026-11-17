@@ -7,6 +7,7 @@ import { createCollaborativeCodeDocument } from "./collaborative-code.ts";
 import { computeTextSplice } from "./collaborative-text.ts";
 import { mergeOwnedStyle, hasOwnedStyle, MAX_STORED_ROOM_CSS_LENGTH, normalizeRoomStyleSelectors, prepareOwnedStyle, projectOwnedStyle, renderOwnedStyles, styleOwnerId, type OwnedStyleDocument } from "./owned-room-style.ts";
 import { createTextEntries, readTextEntries } from "./shared-text-entries.ts";
+import { ROOM_STYLE_SCAFFOLD } from "./room-style.ts";
 
 const alice = styleOwnerId("alice-public-key");
 const bob = styleOwnerId("bob-public-key");
@@ -30,6 +31,45 @@ function renderOwnedStyle(doc: OwnedStyleDocument) { return renderOwnedStyles(do
 function target(owner: string) {
     return `[data-style-owner="${owner}"][data-style-owner="${owner}"]`;
 }
+
+test("after reset, pasting an owned video rule keeps the caret after the pasted text", () => {
+    const rule = '[data-room-part="video-frame"][data-side="own"] {\n    height: 80px;\n    aspect-ratio: auto;\n}';
+    for (const trailing of ["", "\n", "\n\n"]) {
+        for (const place of ["start", "middle", "end"]) {
+            const doc = document(ROOM_STYLE_SCAFFOLD);
+            prepareOwnedStyle(doc, alice, prefix);
+            const base = projectOwnedStyle(doc, alice);
+            const text = readTextEntries(base);
+            const index = place === "start" ? 0 : place === "end" ? text.length : text.indexOf("/* The chat panel. */");
+            const insert = rule + trailing;
+            const caret = index + insert.length;
+            const result = mergeOwnedStyle(doc, alice, base, [{ index, deleteCount: 0, insert }],
+                { start: caret, end: caret, direction: "none" }, prefix, 20_000);
+            assert.equal(result.text.slice(result.selection.start - insert.length, result.selection.start), insert, `${place}: ${JSON.stringify(trailing)}`);
+            assert.equal(result.selection.start, result.selection.end);
+        }
+    }
+});
+
+test("a paste follows its last rule while preserving a concurrent room edit", () => {
+    for (const insert of [
+        '[data-room-part="video-frame"] { height: 80px; }\n\n',
+        '[data-side="own"] { color: red; }\nbody { background: green; }\n\n',
+        'body { background: green; }\n[data-side="own"] { color: red; }\n\n',
+    ]) {
+        const doc = document(ROOM_STYLE_SCAFFOLD);
+        prepareOwnedStyle(doc, alice, prefix);
+        prepareOwnedStyle(doc, bob, prefix);
+        const base = projectOwnedStyle(doc, alice);
+        const b = projectOwnedStyle(doc, bob);
+        edit(doc, bob, b, readTextEntries(b).replace('[data-room-part="title"] {', '[data-room-part="title"] { color: blue;'));
+        const result = mergeOwnedStyle(doc, alice, base, [{ index: base.length, deleteCount: 0, insert }],
+            { start: base.length + insert.length, end: base.length + insert.length, direction: "none" }, prefix, 20_000);
+        const lastRule = insert.trimEnd().split("\n").at(-1)! + "\n\n";
+        assert.equal(result.text.slice(result.selection.start - lastRule.length, result.selection.start), lastRule);
+        assert.ok(result.text.includes('[data-room-part="title"] { color: blue;'));
+    }
+});
 
 test("two people edit their own rules independently while room rules remain shared", () => {
     const doc = document();

@@ -317,8 +317,10 @@ export function mapSelectionByIdentity(
   before: string[],
   after: string[],
   selection: TextSelection,
+    caretAffinity: "left" | "right" = "right",
 ): TextSelection {
-  const start = mapBoundary(before, after, selection.start, "right");
+    const start = mapBoundary(before, after, selection.start,
+        selection.start === selection.end ? caretAffinity : "right");
   const end =
     selection.start === selection.end
       ? start

@@ -87,7 +87,8 @@ test("scaffolding does not truncate custom CSS to make room for default sections
     const css = `body { --value: "${"x".repeat(MAX_ROOM_CSS_LENGTH - 23)}"; }`;
     assert.ok(css.length <= MAX_ROOM_CSS_LENGTH);
     assert.equal(ensureRoomStyleScaffold(css), css);
-    assert.equal(DEFAULT_ROOM_STYLE_TARGETS.length, 11);
+    assert.ok(DEFAULT_ROOM_STYLE_TARGETS.includes('[data-room-part="video-frame"]'));
+    assert.ok(ROOM_STYLE_SCAFFOLD.includes('/* The video image. */\n[data-room-part="video-frame"] {'));
 });
 
 test("simplifies existing defaults without removing custom grid or message text styles", () => {
