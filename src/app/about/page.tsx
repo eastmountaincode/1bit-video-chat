@@ -24,7 +24,7 @@ export default function AboutPage() {
                 <a href="https://hydra.ojack.xyz/">Hydra</a>.
             </p>
             <p>
-                Created in July 2026 during Spencer Chang&apos;s{" "}
+                Created July 2026 during the{" "}
                 <a href="https://spencer.place/creation/building-benches-for-the-web/">
                     Building Benches for the Web
                 </a>{" "}
