@@ -17,7 +17,7 @@ export function AdminRoomManager({ authenticated }: { authenticated: boolean }) 
     const [busy, setBusy] = useState(false);
     const [confirmId, setConfirmId] = useState<string | null>(null);
     const [confirmAllIds, setConfirmAllIds] = useState<string[] | null>(null);
-    const [confirmResetId, setConfirmResetId] = useState<string | null>(null);
+    const [confirmReset, setConfirmReset] = useState<{ id: string; kind: "css" | "chat" } | null>(null);
     const [renameId, setRenameId] = useState<string | null>(null);
     const [renameValue, setRenameValue] = useState("");
     const [roomName, setRoomName] = useState("");
@@ -27,8 +27,8 @@ export function AdminRoomManager({ authenticated }: { authenticated: boolean }) 
     const removableIds = rooms?.filter((room) => room.id !== MAIN_ROOM.id).map((room) => room.id) ?? [];
 
     useEffect(() => {
-        if (confirmId || confirmAllIds || confirmResetId) cancelButton.current?.focus();
-    }, [confirmId, confirmAllIds, confirmResetId]);
+        if (confirmId || confirmAllIds || confirmReset) cancelButton.current?.focus();
+    }, [confirmId, confirmAllIds, confirmReset]);
 
     useEffect(() => {
         if (!signedIn) return;
@@ -50,7 +50,7 @@ export function AdminRoomManager({ authenticated }: { authenticated: boolean }) 
                     setRooms(null);
                     setConfirmId(null);
                     setConfirmAllIds(null);
-                    setConfirmResetId(null);
+                    setConfirmReset(null);
                     setRenameId(null);
                     setError("Your session has expired. Please sign in again.");
                     return;
@@ -95,7 +95,7 @@ export function AdminRoomManager({ authenticated }: { authenticated: boolean }) 
                 setRooms(null);
                 setConfirmId(null);
                 setConfirmAllIds(null);
-                setConfirmResetId(null);
+                setConfirmReset(null);
                 setRenameId(null);
             }
             throw new Error(body.error ?? "Something went wrong. Try again.");
@@ -134,7 +134,7 @@ export function AdminRoomManager({ authenticated }: { authenticated: boolean }) 
             setRooms(null);
             setConfirmId(null);
             setConfirmAllIds(null);
-            setConfirmResetId(null);
+            setConfirmReset(null);
             setRenameId(null);
             setRoomName("");
             setNotice("");
@@ -215,18 +215,18 @@ export function AdminRoomManager({ authenticated }: { authenticated: boolean }) 
         }
     }
 
-    async function resetCss(room: PublicRoomListing) {
+    async function resetRoomContent(room: PublicRoomListing, kind: "css" | "chat") {
         if (busy) return;
         setBusy(true);
         setError("");
         setNotice("");
         revision.current += 1;
         try {
-            await mutate(`/api/admin/rooms/${encodeURIComponent(room.id)}/css`, "DELETE");
-            setConfirmResetId(null);
-            setNotice(`Reset CSS for “${room.name}”.`);
+            await mutate(`/api/admin/rooms/${encodeURIComponent(room.id)}/${kind}`, "DELETE");
+            setConfirmReset(null);
+            setNotice(`${kind === "css" ? "Reset CSS" : "Cleared chat"} for “${room.name}”.`);
         } catch (cause) {
-            setError(cause instanceof Error ? cause.message : "Could not reset CSS.");
+            setError(cause instanceof Error ? cause.message : `Could not ${kind === "css" ? "reset CSS" : "clear chat"}.`);
         } finally {
             revision.current += 1;
             setRefresh((value) => value + 1);
@@ -261,7 +261,7 @@ export function AdminRoomManager({ authenticated }: { authenticated: boolean }) 
                             <button onClick={() => setRefresh((value) => value + 1)} disabled={busy}>Refresh</button>
                             <button className={styles.delete} disabled={busy || removableIds.length === 0} onClick={() => {
                                 setConfirmId(null);
-                                setConfirmResetId(null);
+                                setConfirmReset(null);
                                 setRenameId(null);
                                 setConfirmAllIds(removableIds);
                                 setNotice("");
@@ -311,7 +311,7 @@ export function AdminRoomManager({ authenticated }: { authenticated: boolean }) 
                                                     <button disabled={busy} aria-label={`Rename ${room.name}`} onClick={() => {
                                                         setConfirmId(null);
                                                         setConfirmAllIds(null);
-                                                        setConfirmResetId(null);
+                                                        setConfirmReset(null);
                                                         setRenameId(room.id);
                                                         setRenameValue(room.name);
                                                         setNotice("");
@@ -320,13 +320,20 @@ export function AdminRoomManager({ authenticated }: { authenticated: boolean }) 
                                                         setConfirmId(null);
                                                         setConfirmAllIds(null);
                                                         setRenameId(null);
-                                                        setConfirmResetId(room.id);
+                                                        setConfirmReset({ id: room.id, kind: "css" });
                                                         setNotice("");
                                                     }}>Reset CSS</button>
+                                                    <button disabled={busy} aria-label={`Clear chat for ${room.name}`} onClick={() => {
+                                                        setConfirmId(null);
+                                                        setConfirmAllIds(null);
+                                                        setRenameId(null);
+                                                        setConfirmReset({ id: room.id, kind: "chat" });
+                                                        setNotice("");
+                                                    }}>Clear chat</button>
                                                     {room.id === MAIN_ROOM.id ? <span className={styles.protected}>Protected</span> : (
                                                         <button className={styles.delete} disabled={busy} onClick={() => {
                                                             setConfirmAllIds(null);
-                                                            setConfirmResetId(null);
+                                                            setConfirmReset(null);
                                                             setRenameId(null);
                                                             setConfirmId(room.id);
                                                             setNotice("");
@@ -349,14 +356,14 @@ export function AdminRoomManager({ authenticated }: { authenticated: boolean }) 
                                                 </td>
                                             </tr>
                                         )}
-                                        {confirmResetId === room.id && (
+                                        {confirmReset?.id === room.id && (
                                             <tr>
                                                 <td colSpan={4}>
                                                     <div className={styles.confirmation}>
-                                                        <p>Reset CSS for “{room.name}”?</p>
+                                                        <p>{confirmReset.kind === "css" ? "Reset CSS" : "Clear chat history"} for “{room.name}”?</p>
                                                         <div className={styles.actions}>
-                                                            <button ref={cancelButton} disabled={busy} onClick={() => setConfirmResetId(null)}>Cancel</button>
-                                                            <button disabled={busy} onClick={() => void resetCss(room)}>Reset CSS</button>
+                                                            <button ref={cancelButton} disabled={busy} onClick={() => setConfirmReset(null)}>Cancel</button>
+                                                            <button disabled={busy} onClick={() => void resetRoomContent(room, confirmReset.kind)}>{confirmReset.kind === "css" ? "Reset CSS" : "Clear chat"}</button>
                                                         </div>
                                                     </div>
                                                 </td>

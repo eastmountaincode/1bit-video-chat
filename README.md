@@ -30,9 +30,10 @@ The room synthesizer embeds
 
 Open `/admin` to see room names, creation times, and current participant counts.
 The list refreshes every ten seconds while visible. Open a room to join it normally,
-create or rename rooms, reset their CSS, or delete them after confirmation.
+create or rename rooms, reset their CSS, clear their chat history, or delete them after confirmation.
 Renaming preserves the room URL and shared content. CSS reset restores the commented
-defaults without changing chat or Hydra. Main room can be renamed but cannot be deleted.
+defaults without changing chat or Hydra. Clear chat removes the room's message history
+without changing CSS, Hydra, or participants. Main room can be renamed but cannot be deleted.
 Deletion removes the room from the directory and blocks its URL; connected clients
 leave on their next heartbeat (normally within twenty seconds). It does not erase
 the third-party PlayHTML service's stored chat, CSS, or Hydra data.
