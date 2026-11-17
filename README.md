@@ -16,8 +16,8 @@ The room synthesizer embeds
 - New rooms receive a randomly selected starter from 49 self-contained [Hydra homepage examples](https://github.com/hydra-synth/hydra/blob/main/src/stores/examples.json). The choice is saved with the room, and Hydra stays off until someone presses Run. Existing sketches are preserved. Original credits and [CC BY-NC-SA 4.0 terms](src/lib/hydra-examples.LICENSE.md) accompany the examples.
 - The default CSS template has 11 examples, including your own video name and data rate, separate own/other messages, chat names, and dates. Custom selectors and declarations can be added freely.
 - Randomize in the Hydra panel loads a different starter into the shared draft. Run or Update applies it.
-- Use `[data-room-part="video-card"][data-video-side="own"]` to style your card consistently for everyone.
-- Video cards, images, names, and rates support `data-video-side="own"` or `"other"`. Chat messages, names, dates, and text support `data-message-side="own"` or `"other"`. `own` targets the writer's stable browser identity on every screen; `other` targets everyone except the writer. Removing the condition makes the rule shared. Chat messages created before author IDs were introduced retain general styling only.
+- Use `[data-room-part="video-card"][data-side="own"]` to style your card consistently for everyone.
+- Video cards, images, names, and rates, and chat messages, names, dates, and text all use `data-side="own"` or `"other"`. `own` targets the writer's stable browser identity on every screen; `other` targets everyone except the writer. Removing the condition makes the rule shared. Chat messages created before author IDs were introduced retain general styling only.
 - The server-backed lobby lists public rooms. Creating rooms requires admin access.
 - Every room admits at most 20 active participants, with atomic server-side admission and live counts in the directory and camera lobby.
 - Automatic empty-room deletion is currently disabled. The two-minute expiry policy and deadline bookkeeping remain in place behind `ROOM_EXPIRY_ENABLED`, so they can be restored with a one-line switch; Main room remains permanent.

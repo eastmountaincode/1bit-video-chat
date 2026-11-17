@@ -14,14 +14,14 @@ import type { GrayscaleFrame } from "@/lib/shared-types";
 interface GrayscaleCanvasProps {
   frame: GrayscaleFrame | null;
   renderWhenOffscreen?: boolean;
-    videoSide?: "own" | "other";
+    side?: "own" | "other";
     ownerId?: string;
 }
 
 export const GrayscaleCanvas = memo(function GrayscaleCanvas({
   frame,
   renderWhenOffscreen = false,
-    videoSide,
+    side,
     ownerId,
 }: GrayscaleCanvasProps) {
   const frameRef = useRef<HTMLDivElement>(null);
@@ -113,7 +113,7 @@ export const GrayscaleCanvas = memo(function GrayscaleCanvas({
       className="grayscale-canvas"
       data-room-part="video-frame"
       data-style-owner={ownerId}
-      data-video-side={videoSide}
+      data-side={side}
       ref={frameRef}
       role="img"
     >

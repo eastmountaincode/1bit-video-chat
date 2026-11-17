@@ -2,16 +2,17 @@ import {
   createTextEntries,
   readTextEntriesSafely,
 } from "./shared-text-entries.ts";
+import { normalizeRoomStyleSelectors } from "./owned-room-style.ts";
 
 export const MAX_ROOM_CSS_LENGTH = 20_000;
 export const ROOM_STYLE_COMMENTS_VERSION = 1;
 export const ROOM_STYLE_TEMPLATE_VERSION = 1;
 // Keep templateVersion at 1 for open clients that check it for exact equality.
-export const ROOM_STYLE_TEMPLATE_REVISION = 3;
+export const ROOM_STYLE_TEMPLATE_REVISION = 4;
 
 const OWN_VIDEO_STYLE_TARGETS = [
-    '[data-room-part="video-caption"][data-video-side="own"]',
-    '[data-room-part="video-rate"][data-video-side="own"]',
+    '[data-room-part="video-caption"][data-side="own"]',
+    '[data-room-part="video-rate"][data-side="own"]',
 ] as const;
 
 export const ROOM_STYLE_TARGETS = [
@@ -21,7 +22,7 @@ export const ROOM_STYLE_TARGETS = [
   '[data-room-part="video-field"]',
   '[data-room-part="video-grid"]',
   '[data-room-part="video-card"]',
-  '[data-room-part="video-card"][data-video-side="own"]',
+  '[data-room-part="video-card"][data-side="own"]',
   '[data-room-part="video-frame"]',
   '[data-room-part="video-caption"]',
   '[data-room-part="video-rate"]',
@@ -32,8 +33,8 @@ export const ROOM_STYLE_TARGETS = [
   '[data-room-part="sidebar-tabs"]',
   '[data-room-part="chat"]',
   '[data-room-part="message"]',
-  '[data-room-part="message"][data-message-side="own"]',
-  '[data-room-part="message"][data-message-side="other"]',
+  '[data-room-part="message"][data-side="own"]',
+  '[data-room-part="message"][data-side="other"]',
   '[data-room-part="message-author"]',
   '[data-room-part="message-time"]',
   '[data-room-part="message-text"]',
@@ -50,8 +51,8 @@ export const DEFAULT_ROOM_STYLE_TARGETS = [
     '[data-room-part="video-card"]',
     ...OWN_VIDEO_STYLE_TARGETS,
     '[data-room-part="chat"]',
-    '[data-room-part="message"][data-message-side="own"]',
-    '[data-room-part="message"][data-message-side="other"]',
+    '[data-room-part="message"][data-side="own"]',
+    '[data-room-part="message"][data-side="other"]',
     '[data-room-part="message-author"]',
     '[data-room-part="message-time"]',
 ] as const satisfies readonly (typeof ROOM_STYLE_TARGETS)[number][];
@@ -75,20 +76,20 @@ const ROOM_STYLE_COMMENTS: Record<(typeof ROOM_STYLE_TARGETS)[number], string> =
     '[data-room-part="video-field"]': "The box around all the videos.",
     '[data-room-part="video-grid"]': "How the videos are arranged.",
     '[data-room-part="video-card"]': "Each person's video card.",
-    '[data-room-part="video-card"][data-video-side="own"]': "Your own video card.",
+    '[data-room-part="video-card"][data-side="own"]': "Your own video card.",
     '[data-room-part="video-frame"]': "The video image.",
     '[data-room-part="video-caption"]': "The name below each video.",
     '[data-room-part="video-rate"]': "The data rate below each video.",
-    '[data-room-part="video-caption"][data-video-side="own"]': "The name below your own video.",
-    '[data-room-part="video-rate"][data-video-side="own"]': "The data rate below your own video.",
+    '[data-room-part="video-caption"][data-side="own"]': "The name below your own video.",
+    '[data-room-part="video-rate"][data-side="own"]': "The data rate below your own video.",
     '[data-room-part="leave"]': "The leave room button.",
     '[data-room-part="divider"]': "The draggable line between the two sides.",
     '[data-room-part="sidebar"]': "The chat and controls side.",
     '[data-room-part="sidebar-tabs"]': "The buttons for switching panels.",
     '[data-room-part="chat"]': "The chat panel.",
     '[data-room-part="message"]': "Every chat message.",
-    '[data-room-part="message"][data-message-side="own"]': "Your own chat messages.",
-    '[data-room-part="message"][data-message-side="other"]': "Everyone else's chat messages.",
+    '[data-room-part="message"][data-side="own"]': "Your own chat messages.",
+    '[data-room-part="message"][data-side="other"]': "Everyone else's chat messages.",
     '[data-room-part="message-author"]': "Names in chat.",
     '[data-room-part="message-time"]': "Chat dates and times.",
     '[data-room-part="message-text"]': "The text of each message.",
@@ -110,6 +111,7 @@ const ORIGINAL_SCAFFOLD = ROOM_STYLE_TARGETS.filter((selector) =>
 export function migrateRoomStyleCss(css: string, commentsVersion?: number, templateRevision?: number): string {
     let current = removeObsoleteRoomStyleTargets(css);
     if ((templateRevision ?? 0) < ROOM_STYLE_TEMPLATE_REVISION) {
+        current = normalizeRoomStyleSelectors(current);
         let uncommented = current;
         for (const comment of Object.values(ROOM_STYLE_COMMENTS)) uncommented = uncommented.replaceAll(`/* ${comment} */`, "");
         if (uncommented.replace(/\s/g, "") === ORIGINAL_SCAFFOLD) return ROOM_STYLE_SCAFFOLD;

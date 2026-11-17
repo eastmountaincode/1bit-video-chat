@@ -117,7 +117,7 @@ export const ChatPanel = memo(function ChatPanel({ active, name, ownerId }: Chat
             {ledger.messages.map((item) => (
               <li
                 className={(item.authorId ? item.authorId === ownerId : item.author === name) ? "message-own" : undefined}
-                data-message-side={(item.authorId ? item.authorId === ownerId : item.author === name) ? "own" : "other"}
+                data-side={(item.authorId ? item.authorId === ownerId : item.author === name) ? "own" : "other"}
                 data-room-part="message"
                 data-style-owner={item.authorId}
                 key={item.id}
@@ -126,12 +126,12 @@ export const ChatPanel = memo(function ChatPanel({ active, name, ownerId }: Chat
                     <strong
                         data-room-part="message-author"
                         data-style-owner={item.authorId}
-                        data-message-side={(item.authorId ? item.authorId === ownerId : item.author === name) ? "own" : "other"}
+                        data-side={(item.authorId ? item.authorId === ownerId : item.author === name) ? "own" : "other"}
                     >{item.author}</strong>{" "}
                     <time
                         data-room-part="message-time"
                         data-style-owner={item.authorId}
-                        data-message-side={(item.authorId ? item.authorId === ownerId : item.author === name) ? "own" : "other"}
+                        data-side={(item.authorId ? item.authorId === ownerId : item.author === name) ? "own" : "other"}
                         dateTime={new Date(item.sentAt).toISOString()}
                     >
                     {new Date(item.sentAt).toLocaleString([], {
@@ -146,7 +146,7 @@ export const ChatPanel = memo(function ChatPanel({ active, name, ownerId }: Chat
                 <span
                     data-room-part="message-text"
                     data-style-owner={item.authorId}
-                    data-message-side={(item.authorId ? item.authorId === ownerId : item.author === name) ? "own" : "other"}
+                    data-side={(item.authorId ? item.authorId === ownerId : item.author === name) ? "own" : "other"}
                 >{item.text}</span>
               </li>
             ))}

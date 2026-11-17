@@ -5,13 +5,13 @@ import * as Y from "yjs";
 
 import { createCollaborativeCodeDocument } from "./collaborative-code.ts";
 import { computeTextSplice } from "./collaborative-text.ts";
-import { mergeOwnedStyle, hasOwnedStyle, MAX_STORED_ROOM_CSS_LENGTH, prepareOwnedStyle, projectOwnedStyle, renderOwnedStyles, styleOwnerId, type OwnedStyleDocument } from "./owned-room-style.ts";
-import { readTextEntries } from "./shared-text-entries.ts";
+import { mergeOwnedStyle, hasOwnedStyle, MAX_STORED_ROOM_CSS_LENGTH, normalizeRoomStyleSelectors, prepareOwnedStyle, projectOwnedStyle, renderOwnedStyles, styleOwnerId, type OwnedStyleDocument } from "./owned-room-style.ts";
+import { createTextEntries, readTextEntries } from "./shared-text-entries.ts";
 
 const alice = styleOwnerId("alice-public-key");
 const bob = styleOwnerId("bob-public-key");
-const own = '[data-room-part="video-caption"][data-video-side="own"]';
-const other = '[data-room-part="video-caption"][data-video-side="other"]';
+const own = '[data-room-part="video-caption"][data-side="own"]';
+const other = '[data-room-part="video-caption"][data-side="other"]';
 const initialCss = `body { background: pink; }\n/* My name */\n${own} { color: red; }\n${other} { color: gray; }`;
 let sequence = 0;
 const prefix = () => `test-${sequence++}`;
@@ -49,7 +49,7 @@ test("two people edit their own rules independently while room rules remain shar
     assert.ok(rendered.includes(`${target(alice)} { color: green; }`));
     assert.ok(rendered.includes(`${target(bob)} { color: blue; }`));
     assert.ok(rendered.includes(`:where([data-style-owner]):not([data-style-owner="${alice}"])`));
-    assert.doesNotMatch(rendered, /data-video-side/);
+    assert.doesNotMatch(rendered, /data-side/);
 });
 
 test("removing own makes that rule shared; deleting your editor does not erase other people's rules", () => {
@@ -57,7 +57,7 @@ test("removing own makes that rule shared; deleting your editor does not erase o
     prepareOwnedStyle(doc, alice, prefix);
     prepareOwnedStyle(doc, bob, prefix);
     const a = projectOwnedStyle(doc, alice);
-    edit(doc, alice, a, readTextEntries(a).replace('[data-video-side="own"]', '').replace('color: red', 'color: purple'));
+    edit(doc, alice, a, readTextEntries(a).replace('[data-side="own"]', '').replace('color: red', 'color: purple'));
     assert.match(readTextEntries(projectOwnedStyle(doc, bob)), /color: purple/);
     edit(doc, alice, projectOwnedStyle(doc, alice), "");
     assert.match(readTextEntries(projectOwnedStyle(doc, bob)), /color: red/);
@@ -67,20 +67,20 @@ test("removing own makes that rule shared; deleting your editor does not erase o
 });
 
 test("custom owned chat rules, nested selectors and conditional blocks bind to their writer", () => {
-    const css = `@media (width > 1px) { [data-room-part='message-author'][data-message-side = own] { color: red; &:hover { color: green; } } }\n` +
-        `[data-room-part="video-card"] { & [data-video-side='other'] { color: blue; } }`;
+    const css = `@media (width > 1px) { [data-room-part='message-author'][data-side = own] { color: red; &:hover { color: green; } } }\n` +
+        `[data-room-part="video-card"] { & [data-side='other'] { color: blue; } }`;
     const doc = document(css);
     prepareOwnedStyle(doc, alice, prefix);
     const output = renderOwnedStyle(doc);
     assert.ok(output.includes(target(alice)));
     assert.ok(output.includes(`:not([data-style-owner="${alice}"])`));
     assert.match(output, /&:hover \{ color: green;/);
-    assert.doesNotMatch(output, /data-message-side|data-video-side/);
+    assert.doesNotMatch(output, /data-side/);
 });
 
 test("ownership rewriting leaves comments, strings, URLs, custom values and keyframes intact", () => {
-    const global = `/* [data-video-side="own"] */\n` +
-        `body { content: '[data-message-side="own"]'; background: url("data:image/svg+xml;anything{here}"); --sample: '[data-video-side="other"]'; }\n` +
+    const global = `/* [data-side="own"] */\n` +
+        `body { content: '[data-side="own"]'; background: url("data:image/svg+xml;anything{here}"); --sample: '[data-side="other"]'; }\n` +
         `@keyframes blink { from { opacity: 0; } to { opacity: 1; } }`;
     const doc = document(global);
     prepareOwnedStyle(doc, alice, prefix);
@@ -94,7 +94,7 @@ test("a new ad hoc rule binds to its author and incomplete edits keep its identi
     prepareOwnedStyle(doc, alice, prefix);
     prepareOwnedStyle(doc, bob, prefix);
     const a = projectOwnedStyle(doc, alice);
-    edit(doc, alice, a, readTextEntries(a) + `\n[data-room-part="message-author"][data-message-side="own"] { color: red; }`);
+    edit(doc, alice, a, readTextEntries(a) + `\n[data-room-part="message-author"][data-side="own"] { color: red; }`);
     assert.ok(renderOwnedStyle(doc).includes(target(alice)));
     assert.doesNotMatch(readTextEntries(projectOwnedStyle(doc, bob)), /message-author/);
     const next = projectOwnedStyle(doc, alice);
@@ -108,12 +108,89 @@ test("identity is stable and independent of display names", () => {
     assert.match(styleOwnerId('quotes" and \\ Unicode ñ'), /^p-[a-f0-9]+$/);
 });
 
+test("data-side targets video and chat parts using the same writer identity", () => {
+    const parts = ["video-card", "video-frame", "video-caption", "video-rate", "message", "message-author", "message-time", "message-text"];
+    const css = parts.map((part) => `[data-room-part="${part}"][data-side="own"] { color: red; }`).join("\n");
+    const doc = document("");
+    prepareOwnedStyle(doc, alice, prefix);
+    prepareOwnedStyle(doc, bob, prefix);
+    edit(doc, alice, projectOwnedStyle(doc, alice), css);
+    const rendered = renderOwnedStyle(doc);
+    for (const part of parts) assert.ok(rendered.includes(`[data-room-part="${part}"]${target(alice)} { color: red; }`));
+    assert.equal(readTextEntries(projectOwnedStyle(doc, bob)), "");
+});
+
+test("saved side selectors migrate once for every writer without replacing their character IDs", () => {
+    const global = 'body { content: \'[data-video-side="own"]\'; }';
+    const personal = `/* [data-message-side="own"] */\n` +
+        `[data-room-part="video-card"][data-video-side="own"] { border: 3px solid red; }\n` +
+        `@media (width > 1px) { [data-room-part="message-author"][ data-message-side = 'own' ] { color: red; } }\n` +
+        `[data-message-side=other] { color: gray; }`;
+    const expected = personal.replace('[data-video-side="own"]', '[data-side="own"]')
+        .replace("data-message-side = 'own'", "data-side = 'own'").replace('data-message-side=other', 'data-side=other');
+    const doc = document(global);
+    doc.ownership = {
+        template: personal,
+        people: {
+            [alice]: { entries: createTextEntries(personal, "a") },
+            [bob]: { entries: createTextEntries(personal.replaceAll("red", "blue"), "b") },
+        },
+    };
+    const oldEntries = new Set(doc.ownership.people[alice].entries);
+    assert.equal(hasOwnedStyle(doc, alice), false);
+    prepareOwnedStyle(doc, alice, prefix);
+    assert.equal(hasOwnedStyle(doc, bob), true);
+    assert.equal(doc.id, "epoch");
+    assert.equal(readTextEntries(doc.entries), global);
+    assert.equal(doc.ownership.template, expected);
+    assert.equal(readTextEntries(doc.ownership.people[alice].entries), expected);
+    assert.equal(readTextEntries(doc.ownership.people[bob].entries), expected.replaceAll("red", "blue"));
+    assert.ok(doc.ownership.people[alice].entries.every((entry) => oldEntries.has(entry)));
+    const snapshot = JSON.stringify(doc);
+    prepareOwnedStyle(doc, bob, prefix);
+    assert.equal(JSON.stringify(doc), snapshot);
+
+    // The old spelling is not a supported alias for newly entered CSS.
+    const before = projectOwnedStyle(doc, alice);
+    edit(doc, alice, before, readTextEntries(before) + '\n[data-video-side="own"] { opacity: 0.5; }');
+    assert.ok(readTextEntries(doc.entries).includes('[data-video-side="own"] { opacity: 0.5; }'));
+    assert.equal(normalizeRoomStyleSelectors(expected), expected);
+});
+
+test("two clients migrating the saved selectors concurrently converge without losing declarations", () => {
+    const aDoc = new Y.Doc();
+    const bDoc = new Y.Doc();
+    const a = syncedStore({ state: {} as { current: OwnedStyleDocument } }, aDoc);
+    const b = syncedStore({ state: {} as { current: OwnedStyleDocument } }, bDoc);
+    const legacy = '[data-room-part="message-author"][data-message-side="own"] { font-size: 2em; color: red; }';
+    const seed = document("");
+    seed.ownership = { template: legacy, people: {
+        [alice]: { entries: createTextEntries(legacy, "a") },
+        [bob]: { entries: createTextEntries(legacy.replace("red", "blue"), "b") },
+    } };
+    a.state.current = seed;
+    Y.applyUpdate(bDoc, Y.encodeStateAsUpdate(aDoc));
+    prepareOwnedStyle(a.state.current, alice, prefix);
+    prepareOwnedStyle(b.state.current, bob, prefix);
+    const au = Y.encodeStateAsUpdate(aDoc);
+    const bu = Y.encodeStateAsUpdate(bDoc);
+    Y.applyUpdate(aDoc, bu);
+    Y.applyUpdate(bDoc, au);
+    assert.equal(renderOwnedStyle(a.state.current), renderOwnedStyle(b.state.current));
+    for (const doc of [a.state.current, b.state.current]) {
+        assert.equal(readTextEntries(doc.ownership!.people[alice].entries), legacy.replace("data-message-side", "data-side"));
+        assert.equal(readTextEntries(doc.ownership!.people[bob].entries), legacy.replace("data-message-side", "data-side").replace("red", "blue"));
+    }
+    aDoc.destroy();
+    bDoc.destroy();
+});
+
 test("unfinished personal CSS stays in a separate stylesheet from everyone else's", () => {
     const doc = document();
     prepareOwnedStyle(doc, alice, prefix);
     prepareOwnedStyle(doc, bob, prefix);
     const a = projectOwnedStyle(doc, alice);
-    edit(doc, alice, a, readTextEntries(a) + '\n[data-message-side="own"] { color: green;');
+    edit(doc, alice, a, readTextEntries(a) + '\n[data-side="own"] { color: green;');
     const styles = renderOwnedStyles(doc);
     assert.ok(styles.find((style) => style.id === alice)?.css.endsWith('color: green;'));
     assert.ok(styles.find((style) => style.id === bob)?.css.endsWith('color: gray; }'));

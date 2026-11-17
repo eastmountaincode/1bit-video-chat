@@ -27,7 +27,7 @@ import {
 
 test("simplifies the old default template while preserving customized declarations", () => {
     const original = ROOM_STYLE_TARGETS.filter((selector) =>
-        !/message-(author|time|text)|video-(caption|rate)"\]\[data-video-side/.test(selector))
+        !/message-(author|time|text)|video-(caption|rate)"\]\[data-side/.test(selector))
         .map((selector) => `${selector} {\n  \n}`).join("\n\n");
     assert.equal(migrateRoomStyleCss(original), ROOM_STYLE_SCAFFOLD);
     const customized = original.replace('[data-room-part="room"] {', '[data-room-part="room"] { color: red;');
@@ -38,6 +38,14 @@ test("simplifies the old default template while preserving customized declaratio
     assert.doesNotMatch(migrated, /data-room-part="video-area"/);
     for (const selector of DEFAULT_ROOM_STYLE_TARGETS) assert.ok(migrated.includes(selector));
     assert.equal(migrateRoomStyleCss(""), "");
+});
+
+test("default and migrated room selectors use data-side for both chat and video", () => {
+    assert.doesNotMatch(ROOM_STYLE_SCAFFOLD, /data-(video|message)-side/);
+    const css = '[data-room-part="message"][data-message-side="own"] { color: red; }\n' +
+        '[data-room-part="video-card"][data-video-side="own"] { border: 3px solid green; }';
+    const migrated = migrateRoomStyleCss(css, 1, 3);
+    assert.equal(migrated, css.replaceAll("data-message-side", "data-side").replaceAll("data-video-side", "data-side"));
 });
 
 test("comment migration skips strings and existing comments and respects the size limit", () => {
@@ -85,7 +93,7 @@ test("scaffolding does not truncate custom CSS to make room for default sections
 test("simplifies existing defaults without removing custom grid or message text styles", () => {
     const css = `/* How the videos are arranged. */\n[data-room-part="video-grid"] {\n    \n}\n` +
         `/* The text of each message. */\n[data-room-part="message-text"] {}\n` +
-        `/* Your chat messages. */\n[data-room-part="message"][data-message-side="own"] { color: red; }`;
+        `/* Your chat messages. */\n[data-room-part="message"][data-side="own"] { color: red; }`;
     const migrated = migrateRoomStyleCss(css, 1, 1);
     assert.doesNotMatch(migrated, /video-grid|message-text/);
     assert.match(migrated, /\/\* Your own chat messages\. \*\//);
@@ -114,8 +122,8 @@ test("adds own video examples without narrowing existing styles for everyone", (
     const css = '/* The name below each video. */\n[data-room-part="video-caption"] { color: red; }';
     const migrated = migrateRoomStyleCss(css, 1, 2);
     assert.ok(migrated.startsWith(css));
-    assert.match(migrated, /\[data-room-part="video-caption"\]\[data-video-side="own"\]/);
-    assert.match(migrated, /\[data-room-part="video-rate"\]\[data-video-side="own"\]/);
+    assert.match(migrated, /\[data-room-part="video-caption"\]\[data-side="own"\]/);
+    assert.match(migrated, /\[data-room-part="video-rate"\]\[data-side="own"\]/);
     assert.equal(migrateRoomStyleCss(migrated, 1, ROOM_STYLE_TEMPLATE_REVISION), migrated);
 
     const empty = '/* The name below each video. */\n[data-room-part="video-caption"] {}';
@@ -126,8 +134,8 @@ test("adds own video examples without narrowing existing styles for everyone", (
 });
 
 test("keeps ad hoc ownership rules and deliberate removal of the own condition", () => {
-    const css = '[data-room-part="message-author"][data-message-side="own"] { color: red; }\n' +
-        '[data-room-part="message-time"][data-message-side="other"] { color: blue; }\n' +
+    const css = '[data-room-part="message-author"][data-side="own"] { color: red; }\n' +
+        '[data-room-part="message-time"][data-side="other"] { color: blue; }\n' +
         '[data-room-part="video-caption"] { font-size: 2em; }\n' +
         '.my-custom-selector { outline: 1px solid pink; }';
     assert.equal(migrateRoomStyleCss(css, 1, ROOM_STYLE_TEMPLATE_REVISION), css);

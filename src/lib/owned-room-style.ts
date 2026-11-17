@@ -13,6 +13,7 @@ interface Ownership {
 
 export interface OwnedStyleDocument extends CollaborativeCodeDocument {
     ownership?: Ownership;
+    selectorVersion?: 1;
 }
 
 interface OwnershipToken {
@@ -32,7 +33,7 @@ export function styleOwnerId(identity: string): string {
 }
 
 export function hasOwnedStyle(document: OwnedStyleDocument, owner: string): boolean {
-    return Array.isArray(document.ownership?.people[owner]?.entries);
+    return document.selectorVersion === 1 && Array.isArray(document.ownership?.people[owner]?.entries);
 }
 
 function partition(entries: string[]) {
@@ -47,6 +48,14 @@ function partition(entries: string[]) {
 }
 
 export function prepareOwnedStyle(document: OwnedStyleDocument, owner: string, prefix: () => string): void {
+    if (document.selectorVersion !== 1) {
+        migrateSideEntries(document.entries);
+        if (document.ownership) {
+            document.ownership.template = normalizeRoomStyleSelectors(document.ownership.template);
+            for (const person of Object.values(document.ownership.people)) migrateSideEntries(person.entries);
+        }
+        document.selectorVersion = 1;
+    }
     if (!document.ownership) {
         const parts = partition(document.entries);
         document.ownership = { template: readTextEntries(parts.personal), people: {} };
@@ -128,7 +137,29 @@ export function renderOwnedStyles(document: OwnedStyleDocument): { id: string; c
     return styles;
 }
 
-function ownershipTokens(css: string, start: number, end: number): OwnershipToken[] {
+// Remove only the old attribute prefixes, preserving the shared character IDs.
+// Concurrent clients can perform these same deletions without duplicating text.
+function legacySideDeletions(css: string): { index: number; length: number }[] {
+    return styleBlocks(css, true).flatMap((block) => block.tokens).flatMap((token) => {
+        const match = /^(\[\s*data-)(video-|message-)/i.exec(css.slice(token.start, token.end));
+        return match ? [{ index: token.start + match[1].length, length: match[2].length }] : [];
+    }).sort((a, b) => b.index - a.index);
+}
+
+export function normalizeRoomStyleSelectors(css: string): string {
+    for (const deletion of legacySideDeletions(css)) {
+        css = css.slice(0, deletion.index) + css.slice(deletion.index + deletion.length);
+    }
+    return css;
+}
+
+function migrateSideEntries(entries: string[]): void {
+    for (const deletion of legacySideDeletions(readTextEntries(entries))) {
+        entries.splice(deletion.index, deletion.length);
+    }
+}
+
+function ownershipTokens(css: string, start: number, end: number, migrateLegacy: boolean): OwnershipToken[] {
     const tokens: OwnershipToken[] = [];
     for (let index = start; index < end; index += 1) {
         if (css[index] === "/" && css[index + 1] === "*") {
@@ -143,7 +174,11 @@ function ownershipTokens(css: string, start: number, end: number): OwnershipToke
                 if (css[close] === '"' || css[close] === "'") close = stringEnd(css, close);
                 else if (css[close] === "\\") close += 1;
             }
-            const match = /^\[\s*data-(?:video|message)-side\s*=\s*(?:"(own|other)"|'(own|other)'|(own|other))\s*(?:[is]\s*)?\]$/i.exec(css.slice(index, close + 1));
+            const attribute = css.slice(index, close + 1);
+            const pattern = migrateLegacy
+                ? /^\[\s*data-(?:(?:video|message)-)?side\s*=\s*(?:"(own|other)"|'(own|other)'|(own|other))\s*(?:[is]\s*)?\]$/i
+                : /^\[\s*data-side\s*=\s*(?:"(own|other)"|'(own|other)'|(own|other))\s*(?:[is]\s*)?\]$/i;
+            const match = pattern.exec(attribute);
             if (match) tokens.push({ start: index, end: close + 1, side: (match[1] ?? match[2] ?? match[3]).toLowerCase() as "own" | "other" });
             index = close;
         }
@@ -159,7 +194,7 @@ function stringEnd(css: string, start: number): number {
     return css.length - 1;
 }
 
-function styleBlocks(css: string): StyleBlock[] {
+function styleBlocks(css: string, migrateLegacy = false): StyleBlock[] {
     const blocks: StyleBlock[] = [];
     let start = 0;
     let statementStart = 0;
@@ -187,7 +222,7 @@ function styleBlocks(css: string): StyleBlock[] {
         } else if (character === ")") {
             parentheses = Math.max(0, parentheses - 1);
         } else if (parentheses === 0 && character === "{") {
-            tokens.push(...ownershipTokens(css, statementStart, index));
+            tokens.push(...ownershipTokens(css, statementStart, index, migrateLegacy));
             depth += 1;
             statementStart = index + 1;
         } else if (parentheses === 0 && character === "}") {
@@ -200,7 +235,7 @@ function styleBlocks(css: string): StyleBlock[] {
         }
     }
     if (start < css.length) {
-        if (depth === 0) tokens.push(...ownershipTokens(css, statementStart, css.length));
+        if (depth === 0) tokens.push(...ownershipTokens(css, statementStart, css.length, migrateLegacy));
         finish(css.length);
     }
     return blocks;
