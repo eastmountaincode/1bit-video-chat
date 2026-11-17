@@ -3,11 +3,13 @@ interface VisibleViewport {
     offsetTop: number;
 }
 
-export function getMobileChatViewport(layoutHeight: number, viewport?: VisibleViewport | null) {
-    const height = Math.min(layoutHeight, Math.max(0, viewport?.height ?? layoutHeight));
+export function getMobileChatViewport(fallbackHeight: number, viewport?: VisibleViewport | null) {
+    const height = Math.max(0, viewport?.height ?? fallbackHeight);
     const offsetTop = Math.max(0, viewport?.offsetTop ?? 0);
     return {
         height,
-        bottom: Math.max(0, layoutHeight - height - offsetTop),
+        // Position from the top of the layout viewport. Safari's fixed bottom
+        // edge does not always match innerHeight while its toolbar is moving.
+        bottomEdge: offsetTop + height,
     };
 }

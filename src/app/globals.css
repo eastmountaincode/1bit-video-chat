@@ -679,14 +679,16 @@ legend {
     min-height: auto;
   }
 
-  .chat-panel {
-    bottom: var(--chat-viewport-bottom, 0px);
-    height: auto;
-    position: fixed;
-    right: 0;
-    width: 5rem;
-    z-index: 52;
-  }
+    .chat-panel {
+        bottom: auto;
+        height: auto;
+        position: fixed;
+        right: 0;
+        top: var(--chat-viewport-bottom-edge, 100dvh);
+        transform: translateY(-100%);
+        width: 5rem;
+        z-index: 52;
+    }
 
     .chat-panel.chat-open {
         display: grid;

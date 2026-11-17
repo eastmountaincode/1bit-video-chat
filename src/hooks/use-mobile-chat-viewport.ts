@@ -13,9 +13,9 @@ export function useMobileChatViewport(panelRef: RefObject<HTMLElement | null>, e
         let frame: number | null = null;
         function update() {
             frame = null;
-            const { height, bottom } = getMobileChatViewport(window.innerHeight, viewport);
+            const { height, bottomEdge } = getMobileChatViewport(window.innerHeight, viewport);
             panel!.style.setProperty("--chat-viewport-height", `${height}px`);
-            panel!.style.setProperty("--chat-viewport-bottom", `${bottom}px`);
+            panel!.style.setProperty("--chat-viewport-bottom-edge", `${bottomEdge}px`);
         }
         function schedule() {
             if (frame === null) frame = window.requestAnimationFrame(update);
@@ -32,7 +32,7 @@ export function useMobileChatViewport(panelRef: RefObject<HTMLElement | null>, e
             viewport?.removeEventListener("scroll", schedule);
             window.removeEventListener("resize", schedule);
             panel.style.removeProperty("--chat-viewport-height");
-            panel.style.removeProperty("--chat-viewport-bottom");
+            panel.style.removeProperty("--chat-viewport-bottom-edge");
         };
     }, [enabled, panelRef]);
 }

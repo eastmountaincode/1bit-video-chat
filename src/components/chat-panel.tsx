@@ -4,7 +4,6 @@ import { usePageData, usePlayContext } from "@playhtml/react";
 import { memo, useEffect, useRef, useState, type FormEvent, type PointerEvent } from "react";
 
 import { useMobileLayout } from "@/hooks/use-mobile-layout";
-import { useMobileChatFocus } from "@/hooks/use-mobile-chat-focus";
 import { useMobileChatViewport } from "@/hooks/use-mobile-chat-viewport";
 import { usePageScrollLock } from "@/hooks/use-page-scroll-lock";
 import type { ChatLedger } from "@/lib/shared-types";
@@ -34,7 +33,6 @@ export const ChatPanel = memo(function ChatPanel({ active, name, ownerId }: Chat
 
     usePageScrollLock(isMobile && isOpen);
     useMobileChatViewport(panelRef, isMobile);
-    useMobileChatFocus(inputRef, isMobile && isOpen);
 
     function keepInputFocus(event: PointerEvent<HTMLButtonElement>) {
         // Keep the keyboard from moving a tapped control before its click arrives.
