@@ -1,6 +1,6 @@
 "use client";
 
-import { usePageData, usePlayContext } from "@playhtml/react";
+import { playhtml, usePageData, usePlayContext } from "@playhtml/react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { HydraBackground } from "@/components/hydra-background";
@@ -12,6 +12,7 @@ import {
 import { VideoTile } from "@/components/video-tile";
 import { useGrayscaleCamera } from "@/hooks/use-grayscale-camera";
 import { useVideoPresence } from "@/hooks/use-video-presence";
+import { styleOwnerId } from "@/lib/owned-room-style";
 import type { CaptureSettings } from "@/lib/capture-settings";
 import {
   normalizeRoomHydraData,
@@ -39,6 +40,7 @@ interface VideoRoomProps {
 export function VideoRoom({ captureSettings, initialHydra, name, onCaptureSettingsChange, onLeave, roomName, stream }: VideoRoomProps) {
   const [activePanel, setActivePanel] = useState<SidebarPanel>("chat");
   const { isLoading } = usePlayContext();
+    const ownerId = isLoading ? "" : styleOwnerId(playhtml.presence.getMyIdentity().publicKey);
   const [rawRoomHydra, setRoomHydra] = usePageData<RoomHydraData>(
     "room-hydra:v1",
     initialHydra,
@@ -198,6 +200,7 @@ export function VideoRoom({ captureSettings, initialHydra, name, onCaptureSettin
             <VideoTile
               frame={frame}
               isMe
+              ownerId={ownerId}
               name={name}
               payloadRate={localPayloadRate}
             />
@@ -206,6 +209,7 @@ export function VideoRoom({ captureSettings, initialHydra, name, onCaptureSettin
                 frame={participant.frame}
                 key={participant.id}
                 name={participant.name}
+                ownerId={styleOwnerId(participant.id)}
                 payloadRate={participant.payloadRate}
               />
             ))}
@@ -221,6 +225,7 @@ export function VideoRoom({ captureSettings, initialHydra, name, onCaptureSettin
           roomHydra.enabled ? hydraRuntimeStatus : null
         }
         name={name}
+        ownerId={ownerId}
         onCaptureSettingsChange={onCaptureSettingsChange}
         onHydraRun={runHydra}
         onHydraStop={stopHydra}

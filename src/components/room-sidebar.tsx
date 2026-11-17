@@ -23,6 +23,7 @@ interface RoomSidebarProps {
   hydraDisabled: boolean;
   hydraRuntimeStatus: HydraRuntimeStatus | null;
   name: string;
+    ownerId: string;
   onCaptureSettingsChange: (settings: CaptureSettings) => void;
   onHydraRun: (code: string) => void;
   onHydraStop: () => void;
@@ -41,6 +42,7 @@ export function RoomSidebar({
   hydraDisabled,
   hydraRuntimeStatus,
   name,
+    ownerId,
   onCaptureSettingsChange,
   onHydraRun,
   onHydraStop,
@@ -106,13 +108,13 @@ export function RoomSidebar({
       </header>
 
       <div className="sidebar-panels">
-        <ChatPanel active={activePanel === "chat"} name={name} />
+        <ChatPanel active={activePanel === "chat"} name={name} ownerId={ownerId} />
         <HelperPanel
           active={activePanel === "settings"}
           onChange={onCaptureSettingsChange}
           settings={captureSettings}
         />
-        <StylePanel active={activePanel === "style"} name={name} />
+        <StylePanel active={activePanel === "style"} name={name} ownerId={ownerId} />
         <HydraPanel
           active={activePanel === "hydra"}
           disabled={hydraDisabled}

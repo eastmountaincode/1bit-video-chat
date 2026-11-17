@@ -13,9 +13,10 @@ const defaultLedger: ChatLedger = { messages: [], version: 1 };
 interface ChatPanelProps {
   active: boolean;
   name: string;
+    ownerId: string;
 }
 
-export const ChatPanel = memo(function ChatPanel({ active, name }: ChatPanelProps) {
+export const ChatPanel = memo(function ChatPanel({ active, name, ownerId }: ChatPanelProps) {
   const [ledger, setLedger] = usePageData<ChatLedger>(
     "global-chat:v1",
     defaultLedger,
@@ -38,13 +39,14 @@ export const ChatPanel = memo(function ChatPanel({ active, name }: ChatPanelProp
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const text = message.trim();
-    if (!text || isLoading) return;
+    if (!text || isLoading || !ownerId) return;
 
     setLedger((draft) => {
       draft.version = 1;
       draft.messages ??= [];
       draft.messages.push({
         author: name,
+        authorId: ownerId,
         id: crypto.randomUUID(),
         sentAt: Date.now(),
         text: text.slice(0, 500),
@@ -114,19 +116,22 @@ export const ChatPanel = memo(function ChatPanel({ active, name }: ChatPanelProp
             {ledger.messages.length === 0 ? <li>no messages yet</li> : null}
             {ledger.messages.map((item) => (
               <li
-                className={item.author === name ? "message-own" : undefined}
-                data-message-side={item.author === name ? "own" : "other"}
+                className={(item.authorId ? item.authorId === ownerId : item.author === name) ? "message-own" : undefined}
+                data-message-side={(item.authorId ? item.authorId === ownerId : item.author === name) ? "own" : "other"}
                 data-room-part="message"
+                data-style-owner={item.authorId}
                 key={item.id}
               >
                 <span className="message-meta">
                     <strong
                         data-room-part="message-author"
-                        data-message-side={item.author === name ? "own" : "other"}
+                        data-style-owner={item.authorId}
+                        data-message-side={(item.authorId ? item.authorId === ownerId : item.author === name) ? "own" : "other"}
                     >{item.author}</strong>{" "}
                     <time
                         data-room-part="message-time"
-                        data-message-side={item.author === name ? "own" : "other"}
+                        data-style-owner={item.authorId}
+                        data-message-side={(item.authorId ? item.authorId === ownerId : item.author === name) ? "own" : "other"}
                         dateTime={new Date(item.sentAt).toISOString()}
                     >
                     {new Date(item.sentAt).toLocaleString([], {
@@ -140,7 +145,8 @@ export const ChatPanel = memo(function ChatPanel({ active, name }: ChatPanelProp
                 </span>
                 <span
                     data-room-part="message-text"
-                    data-message-side={item.author === name ? "own" : "other"}
+                    data-style-owner={item.authorId}
+                    data-message-side={(item.authorId ? item.authorId === ownerId : item.author === name) ? "own" : "other"}
                 >{item.text}</span>
               </li>
             ))}

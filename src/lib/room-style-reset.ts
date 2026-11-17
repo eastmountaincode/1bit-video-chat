@@ -1,4 +1,5 @@
 import * as Y from "yjs";
+import { OWNED_ROOM_STYLE_CHANNEL } from "./owned-room-style.ts";
 
 import { createRoomStyleDocument, ROOM_STYLE_SCAFFOLD, ROOM_STYLE_COMMENTS_VERSION, ROOM_STYLE_TEMPLATE_VERSION, ROOM_STYLE_TEMPLATE_REVISION } from "./room-style.ts";
 
@@ -28,6 +29,16 @@ export function resetSharedRoomStyle(document: Y.Doc, id: string, now: number): 
         legacy.set("version", 1);
         legacy.set("updatedAt", now);
         legacy.set("updatedBy", "Admin");
+
+        const ownedStyle = childMap(page, OWNED_ROOM_STYLE_CHANNEL);
+        const ownedEntries = new Y.Array<string>();
+        ownedEntries.push(current.entries);
+        ownedStyle.set("current", new Y.Map<unknown>([
+            ["id", current.id], ["createdAt", current.createdAt], ["entries", ownedEntries],
+        ]));
+        ownedStyle.set("version", 1);
+        ownedStyle.set("updatedAt", now);
+        ownedStyle.set("updatedBy", "Admin");
     });
 }
 

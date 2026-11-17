@@ -4,6 +4,7 @@ import { usePageData, usePlayContext } from "@playhtml/react";
 import {
   useEffect,
   useLayoutEffect,
+    useMemo,
   useRef,
   useState,
   type ChangeEvent,
@@ -15,6 +16,7 @@ import {
 import {
   createCollaborativeCodeDocument,
   type CollaborativeCodeData,
+    type CollaborativeCodeDocument,
 } from "@/lib/collaborative-code";
 import { getCodeEditorShortcut } from "@/lib/code-editor-shortcut";
 import {
@@ -35,7 +37,16 @@ import {
   type TextIndentationEdit,
 } from "@/lib/text-indentation";
 
+export interface CodeDocumentAdapter {
+    initialize: (document: CollaborativeCodeDocument) => void;
+    ready: (document: CollaborativeCodeDocument) => boolean;
+    project: (document: CollaborativeCodeDocument) => string[];
+    merge: (document: CollaborativeCodeDocument, base: string[], splices: TextSplice[], selection: TextSelection, prefix: () => string, maxLength: number) => SharedTextMerge;
+}
+
 interface CollaborativeCodeEditorOptions {
+    documentAdapter?: CodeDocumentAdapter;
+    maxStoredLength?: number;
   channelName: string;
   defaultData: CollaborativeCodeData;
   disabled: boolean;
@@ -67,10 +78,12 @@ function clampSelection(
 export function useCollaborativeCodeEditor({
   channelName,
   defaultData,
+    documentAdapter,
   disabled,
   entryPrefix,
   initialCode,
   maxLength,
+    maxStoredLength = maxLength,
   name,
   onRunShortcut,
   onStopShortcut,
@@ -92,7 +105,7 @@ export function useCollaborativeCodeEditor({
   const sharedCode =
     sharedEntries === null
       ? null
-      : readTextEntriesSafely(sharedEntries, maxLength);
+      : readTextEntriesSafely(sharedEntries, maxStoredLength);
   const hasCurrentDocument = sharedEntries !== null;
   const rawCurrentDocumentId = sharedDocument.current?.id;
   const currentDocumentId =
@@ -104,7 +117,7 @@ export function useCollaborativeCodeEditor({
     hasCurrentDocument &&
     (sharedCode === null || currentDocumentId === null);
   const currentDocumentExceedsLimit =
-    (sharedEntries?.length ?? 0) > maxLength;
+    (sharedEntries?.length ?? 0) > maxStoredLength;
   const currentDocumentIsEditable =
     hasCurrentDocument &&
     !currentDocumentIsMalformed &&
@@ -112,9 +125,13 @@ export function useCollaborativeCodeEditor({
     sharedDocument.version === 1;
   const reconciliationNeeded =
     hasCurrentDocument && !currentDocumentIsEditable;
-  const editorSharedEntries = currentDocumentIsEditable
-    ? sharedEntries
-    : null;
+    const codeDocument = sharedDocument.current;
+    const adapterReady = !documentAdapter || (codeDocument !== null && documentAdapter.ready(codeDocument));
+    const editorSharedEntries = useMemo(() => {
+        if (!currentDocumentIsEditable || !codeDocument) return null;
+        return documentAdapter ? documentAdapter.project(codeDocument) : codeDocument.entries;
+    }, [currentDocumentIsEditable, codeDocument, documentAdapter]);
+    const visibleCode = editorSharedEntries ? readTextEntriesSafely(editorSharedEntries, maxStoredLength) : null;
   const controlsDisabled = disabled || isLoading;
   const [editorValue, setEditorValue] = useState(initialCode);
   const [selectionRevision, setSelectionRevision] = useState(0);
@@ -167,8 +184,9 @@ export function useCollaborativeCodeEditor({
           initialCode,
           crypto.randomUUID(),
           Date.now(),
-          maxLength,
+          maxStoredLength,
         );
+        documentAdapter?.initialize(draft.current);
         draft.updatedAt = Date.now();
         draft.updatedBy = name;
         draft.version = 1;
@@ -180,7 +198,8 @@ export function useCollaborativeCodeEditor({
     controlsDisabled,
     hasCurrentDocument,
     initialCode,
-    maxLength,
+    maxStoredLength,
+    documentAdapter,
     name,
     reconciliationDelayMs,
     setSharedDocument,
@@ -194,11 +213,11 @@ export function useCollaborativeCodeEditor({
         const liveEntries = draft.current?.entries;
         if (!Array.isArray(liveEntries)) return;
 
-        const liveCode = readTextEntriesSafely(liveEntries, maxLength);
+        const liveCode = readTextEntriesSafely(liveEntries, maxStoredLength);
         const liveDocumentId = draft.current?.id;
         const liveDocumentIsValid =
           liveCode !== null &&
-          liveEntries.length <= maxLength &&
+          liveEntries.length <= maxStoredLength &&
           typeof liveDocumentId === "string" &&
           liveDocumentId.length > 0 &&
           draft.version === 1;
@@ -209,8 +228,9 @@ export function useCollaborativeCodeEditor({
           liveCode ?? initialCode,
           crypto.randomUUID(),
           Date.now(),
-          maxLength,
+          maxStoredLength,
         );
+        documentAdapter?.initialize(draft.current);
         draft.updatedAt = Date.now();
         draft.updatedBy = name;
         draft.version = 1;
@@ -221,15 +241,23 @@ export function useCollaborativeCodeEditor({
   }, [
     controlsDisabled,
     initialCode,
-    maxLength,
+    maxStoredLength,
+    documentAdapter,
     name,
     reconciliationDelayMs,
     reconciliationNeeded,
     setSharedDocument,
   ]);
 
+    useEffect(() => {
+        if (controlsDisabled || !currentDocumentIsEditable || adapterReady || !documentAdapter) return;
+        setSharedDocument((draft) => {
+            if (draft.current) documentAdapter.initialize(draft.current);
+        });
+    }, [controlsDisabled, currentDocumentIsEditable, adapterReady, currentDocumentId, documentAdapter, setSharedDocument]);
+
   useLayoutEffect(() => {
-    if (!editorSharedEntries || sharedCode === null || isComposingRef.current) {
+    if (!editorSharedEntries || visibleCode === null || isComposingRef.current) {
       return;
     }
 
@@ -256,14 +284,14 @@ export function useCollaborativeCodeEditor({
 
     documentIdRef.current = currentDocumentId;
     updateEditor(
-      sharedCode,
+      visibleCode,
       [...editorSharedEntries],
       nextSelection,
     );
   }, [
     currentDocumentId,
     editorSharedEntries,
-    sharedCode,
+    visibleCode,
   ]);
 
   useLayoutEffect(() => {
@@ -292,7 +320,7 @@ export function useCollaborativeCodeEditor({
       selection: clampSelection(selection, before.length),
       text: before,
     };
-    if (controlsDisabled || !currentDocumentIsEditable) return result;
+    if (controlsDisabled || !currentDocumentIsEditable || !adapterReady) return result;
 
     setSharedDocument((draft) => {
       const liveDocument = draft.current;
@@ -300,7 +328,7 @@ export function useCollaborativeCodeEditor({
 
       const liveCode = readTextEntriesSafely(
         liveDocument.entries,
-        maxLength,
+        maxStoredLength,
       );
       const liveDocumentId =
         typeof liveDocument.id === "string" &&
@@ -309,9 +337,10 @@ export function useCollaborativeCodeEditor({
           : null;
       const liveDocumentIsEditable =
         liveCode !== null &&
-        liveDocument.entries.length <= maxLength &&
+        liveDocument.entries.length <= maxStoredLength &&
         liveDocumentId !== null &&
         draft.version === 1;
+        const visibleEntries = documentAdapter ? documentAdapter.project(liveDocument) : liveDocument.entries;
 
       if (
         !liveDocumentIsEditable ||
@@ -322,19 +351,29 @@ export function useCollaborativeCodeEditor({
         documentIdRef.current = liveDocumentId;
         result = {
           accepted: false,
-          entries: [...liveDocument.entries],
+          entries: [...visibleEntries],
           operations: [],
           selection:
             documentEpochMatches && liveDocumentIsEditable
               ? mapSelectionByIdentity(
                   editorEntriesRef.current,
-                  liveDocument.entries,
+                  visibleEntries,
                   selection,
                 )
               : clampSelection(selection, liveCode?.length ?? 0),
-          text: liveCode ?? before,
+          text: readTextEntriesSafely(visibleEntries, maxStoredLength) ?? before,
         };
         return;
+      }
+
+      if (documentAdapter) {
+          result = documentAdapter.merge(liveDocument, editorEntriesRef.current, localSplices, selection, createEntryPrefix, maxLength);
+          if (result.operations.length > 0) {
+              draft.updatedAt = Date.now();
+              draft.updatedBy = name;
+              draft.version = 1;
+          }
+          return;
       }
 
       result = mergeTextEntrySplices(
@@ -343,7 +382,7 @@ export function useCollaborativeCodeEditor({
         localSplices,
         selection,
         createEntryPrefix,
-        maxLength,
+        maxStoredLength,
       );
 
       for (const operation of result.operations) {
@@ -359,6 +398,7 @@ export function useCollaborativeCodeEditor({
         draft.updatedBy = name;
         draft.version = 1;
       }
+
     });
 
     return result;
@@ -400,7 +440,8 @@ export function useCollaborativeCodeEditor({
     function replaceCode(code: string) {
         if (controlsDisabled || !currentDocumentIsEditable || isComposingRef.current || code.length > maxLength) return;
         const now = Date.now();
-        const next = createCollaborativeCodeDocument(code, crypto.randomUUID(), now, maxLength);
+        const next = createCollaborativeCodeDocument(code, crypto.randomUUID(), now, maxStoredLength);
+        documentAdapter?.initialize(next);
         setSharedDocument((draft) => {
             draft.current = next;
             draft.updatedAt = now;
@@ -409,7 +450,8 @@ export function useCollaborativeCodeEditor({
         });
         documentIdRef.current = next.id;
         compositionFinalValueRef.current = null;
-        updateEditor(code, next.entries, { start: 0, end: 0, direction: "none" });
+        const entries = documentAdapter ? documentAdapter.project(next) : next.entries;
+        updateEditor(readTextEntriesSafely(entries, maxLength) ?? code, entries, { start: 0, end: 0, direction: "none" });
         if (textareaRef.current) textareaRef.current.scrollTop = 0;
     }
 
@@ -564,7 +606,8 @@ export function useCollaborativeCodeEditor({
 
   return {
     controlsDisabled,
-    editorDisabled: controlsDisabled || !currentDocumentIsEditable,
+    sharedDocument,
+    editorDisabled: controlsDisabled || !currentDocumentIsEditable || !adapterReady,
     editorValue,
     handleBlur,
     handleChange,

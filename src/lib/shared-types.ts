@@ -19,6 +19,7 @@ export interface VideoPayloadRate {
 
 export interface ChatMessage {
   author: string;
+    authorId?: string;
   id: string;
   sentAt: number;
   text: string;

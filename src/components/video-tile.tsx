@@ -16,6 +16,7 @@ interface VideoTileProps {
   frame: GrayscaleFrame | null;
   isMe?: boolean;
   name: string;
+    ownerId?: string;
   payloadRate?: VideoPayloadRate | null;
   renderWhenOffscreen?: boolean;
 }
@@ -24,6 +25,7 @@ export const VideoTile = memo(function VideoTile({
   frame,
   isMe = false,
   name,
+    ownerId,
   payloadRate,
   renderWhenOffscreen = false,
 }: VideoTileProps) {
@@ -151,17 +153,20 @@ export const VideoTile = memo(function VideoTile({
     <figure
       className="video-tile"
       data-room-part="video-card"
+      data-style-owner={ownerId}
       data-video-side={isMe ? "own" : "other"}
     >
       <GrayscaleCanvas
         frame={frame}
         renderWhenOffscreen={renderWhenOffscreen}
         videoSide={isMe ? "own" : "other"}
+        ownerId={ownerId}
       />
       <figcaption>
         <span
             className="video-caption-name"
             data-room-part="video-caption"
+            data-style-owner={ownerId}
             data-video-side={isMe ? "own" : "other"}
         >
           {name}
@@ -172,6 +177,7 @@ export const VideoTile = memo(function VideoTile({
           className="video-rate"
           data-rate-kind="encoded-video-payload"
           data-room-part="video-rate"
+          data-style-owner={ownerId}
           data-video-side={isMe ? "own" : "other"}
           title="Encoded video payload rate. PlayHTML transport overhead is not included."
         >
@@ -188,6 +194,7 @@ function areVideoTilePropsEqual(
 ) {
   return (
     previous.name === next.name &&
+    previous.ownerId === next.ownerId &&
     Boolean(previous.isMe) === Boolean(next.isMe) &&
     Boolean(previous.renderWhenOffscreen) ===
       Boolean(next.renderWhenOffscreen) &&

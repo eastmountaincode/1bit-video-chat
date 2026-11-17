@@ -5,6 +5,8 @@ import { syncedStore } from "@syncedstore/core";
 
 import { getSharedRoomStyleId, resetSharedRoomStyle } from "./room-style-reset.ts";
 import { getCollaborativeRoomStyleCss, ROOM_STYLE_SCAFFOLD, type CollaborativeRoomStyleData } from "./room-style.ts";
+import { getCollaborativeCode } from "./collaborative-code.ts";
+import { OWNED_ROOM_STYLE_CHANNEL } from "./owned-room-style.ts";
 
 test("admin CSS reset reaches another client without changing chat or Hydra", () => {
     const writer = new Y.Doc();
@@ -14,6 +16,7 @@ test("admin CSS reset reaches another client without changing chat or Hydra", ()
         "global-chat:v1": { messages: [{ text: "keep me" }], version: 1 },
         "room-hydra:v1": { code: "osc().out()", enabled: true, version: 1 },
         "room-style:v1": { css: "body {display:none}", version: 1 },
+        [OWNED_ROOM_STYLE_CHANNEL]: { current: { id: "old", entries: [], ownership: { template: "old", people: {} } }, version: 1 },
     };
     Y.applyUpdate(reader, Y.encodeStateAsUpdate(writer));
     const before = reader.getMap("play").toJSON().__page__;
@@ -25,6 +28,8 @@ test("admin CSS reset reaches another client without changing chat or Hydra", ()
     assert.equal(getCollaborativeRoomStyleCss(page["room-style:v2"] as CollaborativeRoomStyleData, ""), ROOM_STYLE_SCAFFOLD);
     assert.equal(page["room-style:v1"].css, ROOM_STYLE_SCAFFOLD);
     assert.equal(page["room-style:v2"].chars.join(""), ROOM_STYLE_SCAFFOLD);
+    assert.equal(getCollaborativeCode(page[OWNED_ROOM_STYLE_CHANNEL], "", 20_000), ROOM_STYLE_SCAFFOLD);
+    assert.equal(page[OWNED_ROOM_STYLE_CHANNEL].current.ownership, undefined);
     assert.deepEqual(page["global-chat:v1"], before["global-chat:v1"]);
     assert.deepEqual(page["room-hydra:v1"], before["room-hydra:v1"]);
     writer.destroy();
