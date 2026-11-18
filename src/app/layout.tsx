@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
+import { Analytics } from "@vercel/analytics/next";
 
 import { LayoutDebug } from "@/components/layout-debug";
 
@@ -34,6 +35,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         <html lang="en">
             <body>
                 {children}
+                <Analytics />
                 {process.env.NODE_ENV === "development" ? <LayoutDebug /> : null}
             </body>
         </html>
